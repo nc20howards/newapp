@@ -98,7 +98,7 @@ export const createBulkSchoolUsers = (
     const errors: string[] = [];
     let successCount = 0;
     const usersToSave: User[] = [];
-    const schoolUserRoles: SchoolUserRole[] = ['student', 'teacher', 'head_of_department', 'canteen_seller', 'deputy_headteacher'];
+    const schoolUserRoles: SchoolUserRole[] = ['student', 'teacher', 'head_of_department', 'canteen_seller', 'deputy_headteacher', 'carrier'];
 
     // Use a Set for efficient duplicate checking within the file
     const fileUserIds = new Set<string>();
@@ -309,6 +309,64 @@ export const unassignSellerFromShop = (shopId: string): void => {
 
     delete targetShop.ownerId;
 
+    saveUsers(users);
+    saveShops(shops);
+};
+
+/**
+ * Assigns a user as a carrier for a specific shop.
+ * @param userId The ID of the user to assign.
+ * @param shopId The ID of the shop to assign them to.
+ */
+export const assignCarrierToShop = (userId: string, shopId: string): void => {
+    const users = getUsers();
+    const shops = getShops();
+    
+    const targetUser = users.find(u => u.studentId === userId);
+    const targetShop = shops.find(s => s.id === shopId);
+    
+    if (!targetUser) throw new Error("User to be assigned not found.");
+    if (!targetShop) throw new Error("Shop not found.");
+    
+    // Set user role
+    targetUser.role = 'carrier';
+    
+    // Add to shop's carrier list
+    if (!targetShop.carrierIds) {
+        targetShop.carrierIds = [];
+    }
+    if (!targetShop.carrierIds.includes(userId)) {
+        targetShop.carrierIds.push(userId);
+    }
+    
+    saveUsers(users);
+    saveShops(shops);
+};
+
+/**
+ * Unassigns a carrier from a shop.
+ * @param userId The ID of the user to unassign.
+ * @param shopId The ID of the shop.
+ */
+export const unassignCarrierFromShop = (userId: string, shopId: string): void => {
+    const users = getUsers();
+    const shops = getShops();
+    
+    const targetUser = users.find(u => u.studentId === userId);
+    const targetShop = shops.find(s => s.id === shopId);
+
+    if (!targetUser) throw new Error("User to be unassigned not found.");
+    if (!targetShop || !targetShop.carrierIds) return;
+    
+    // Remove from carrier list
+    targetShop.carrierIds = targetShop.carrierIds.filter(id => id !== userId);
+    
+    // If they are no longer a carrier for any other shop, revert their role
+    const isCarrierForOtherShops = shops.some(s => s.carrierIds?.includes(userId));
+    if (!isCarrierForOtherShops) {
+        targetUser.role = 'student'; // Revert to a default role
+    }
+    
     saveUsers(users);
     saveShops(shops);
 };

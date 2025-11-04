@@ -25,6 +25,7 @@ import * as smartIdService from '../services/smartIdService';
 import CustomSmartIdCard, { CustomSmartIdCardDownloadable } from './CustomSmartIdCard';
 import * as customIdTemplateService from '../services/customIdTemplateService';
 import ECanteenStudentPage, { CanteenSellerDashboard } from './ECanteenStudentPage';
+import CarrierPage from './CarrierPage';
 import StudentNcheView from './StudentNcheView';
 import ReportCard from './ReportCard';
 import * as classService from '../services/classService';
@@ -100,12 +101,9 @@ const NewsIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w
 const ResultsAnalytics: React.FC<{ results: InternalExamResult[] }> = ({ results }) => {
     // 1. Sort results to get latest and previous
     const sortedResults = [...results].sort((a, b) => {
-        // FIX: Replaced brittle string splitting with a more robust regex-based parser
-        // to handle various term formats and prevent runtime errors.
         const parseTerm = (term: string): { year: number; termNum: number } => {
             const yearMatch = term.match(/(\d{4})/);
             const termMatch = term.match(/Term (\d+)/i);
-            // FIX: Replaced ambiguous Number() coercion with parseInt() for explicit integer parsing.
             const year = yearMatch ? parseInt(yearMatch[1], 10) : 0;
             const termNum = termMatch ? parseInt(termMatch[1], 10) : 0;
             return { year, termNum };
@@ -126,8 +124,6 @@ const ResultsAnalytics: React.FC<{ results: InternalExamResult[] }> = ({ results
         if (!latestResult) {
             return { bestSubjects: [], betterSubjects: [], poorlySubjects: [] };
         }
-        // FIX: Replaced direct arithmetic with explicit Number() conversion to prevent type errors
-        // when 'score' is unexpectedly a string. This resolves the runtime error.
         const allSubjects = [...latestResult.subjects].sort((a, b) => Number(b.score) - Number(a.score));
         return {
             bestSubjects: allSubjects.filter(s => Number(s.score) >= 80),
@@ -146,7 +142,6 @@ const ResultsAnalytics: React.FC<{ results: InternalExamResult[] }> = ({ results
             .map(currentSub => {
                 const prevScore = prevScores.get(currentSub.name);
                 if (prevScore === undefined) return null;
-                // FIX: Added explicit type conversion to prevent potential runtime errors with mixed types.
                 return { name: currentSub.name, change: Number(currentSub.score) - Number(prevScore) };
             })
             .filter((c): c is { name: string; change: number } => c !== null);
@@ -269,7 +264,6 @@ interface StudentResultsViewProps {
 const StudentResultsView: React.FC<StudentResultsViewProps> = ({ user, onDownload, isDownloading }) => {
     const internalResults = user.internalExams || [];
     const sortedInternalResults = [...internalResults].sort((a, b) => {
-        // FIX: Replaced localeCompare with a robust parsing function to ensure correct chronological sorting of terms.
         const parseTerm = (term: string): { year: number; termNum: number } => {
             const yearMatch = term.match(/(\d{4})/);
             const termMatch = term.match(/Term (\d+)/i);
@@ -1256,6 +1250,7 @@ export const StudentAdmissionPortal: React.FC<StudentAdmissionPortalProps> = ({ 
     );
 };
 
+// FIX: Added missing SmartIdViewer component definition before its usage in StudentPage.
 // --- Smart ID Viewer Modal ---
 interface SmartIdViewerProps {
     user: User;
@@ -1470,6 +1465,9 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
         if (activeModule?.name === E_CANTEEN_MODULE_NAME && school) {
             if (currentUser.role === 'canteen_seller' && currentUser.shopId) {
                 return <CanteenSellerDashboard user={currentUser} school={school} />;
+            }
+            if (currentUser.role === 'carrier') {
+                return <CarrierPage user={currentUser} school={school} />;
             }
             return <ECanteenStudentPage school={school} user={currentUser} />;
         }
@@ -1688,4 +1686,53 @@ const NewsFeedView: React.FC = () => {
                     </div>
                 </div>
             )}
-            <h2 className="text-2xl sm:text-3xl font
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">News Feed</h2>
+            
+            <div className="flex items-center space-x-2 overflow-x-auto pb-4 mb-4">
+                {categories.map(category => (
+                    <button
+                        key={category}
+                        onClick={() => setActiveCategory(category)}
+                        className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap ${activeCategory === category ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                    >
+                        {category}
+                    </button>
+                ))}
+            </div>
+
+            {isLoading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[...Array(6)].map((_, i) => (
+                        <div key={i} className="bg-gray-800 rounded-lg shadow-lg animate-pulse">
+                            <div className="w-full h-40 bg-gray-700 rounded-t-lg"></div>
+                            <div className="p-4">
+                                <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
+                                <div className="h-3 bg-gray-700 rounded w-full mb-1"></div>
+                                <div className="h-3 bg-gray-700 rounded w-5/6"></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {error && <div className="p-4 text-center bg-red-500/10 text-red-300 rounded-lg">{error}</div>}
+
+            {!isLoading && !error && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {news.map((story, index) => (
+                        <div key={index} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
+                            {story.imageUrl && <img src={story.imageUrl} alt={story.title} className="w-full h-40 object-cover" />}
+                            <div className="p-4 flex flex-col flex-grow">
+                                <h3 className="font-bold text-lg text-white mb-2 flex-grow">{story.title}</h3>
+                                <p className="text-sm text-gray-400 mb-4">{story.summary}</p>
+                                <button onClick={() => setViewingUrl(story.url)} className="text-cyan-400 hover:text-cyan-300 font-semibold self-start text-sm">
+                                    Read Full Story &rarr;
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};

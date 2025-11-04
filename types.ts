@@ -1,7 +1,7 @@
 // types.ts
 
 // --- User & Auth Types ---
-export type SchoolUserRole = 'student' | 'teacher' | 'head_of_department' | 'canteen_seller' | 'deputy_headteacher' | 'parent' | 'old_student';
+export type SchoolUserRole = 'student' | 'teacher' | 'head_of_department' | 'canteen_seller' | 'deputy_headteacher' | 'parent' | 'old_student' | 'carrier';
 
 export interface User {
   name: string;
@@ -416,9 +416,22 @@ export interface CustomIdTemplate {
 // --- E-Canteen ---
 export type PaymentMethod = 'e_wallet' | 'rfid' | 'nfc' | 'barcode';
 
+export interface CanteenTable {
+  id: string;
+  label: string;
+  capacity: number;
+}
+
+export interface CanteenSeatSettings {
+  totalStudents: number;
+  breakfastMinutes: number;
+  tables: CanteenTable[];
+}
+
 export interface CanteenSettings {
   schoolId: string;
   activePaymentMethod: PaymentMethod;
+  seatSettings: CanteenSeatSettings;
 }
 
 export interface CanteenMenuItem {
@@ -445,6 +458,7 @@ export interface CanteenShop {
   name: string;
   description: string;
   ownerId?: string; // userId of the canteen_seller
+  carrierIds?: string[];
 }
 
 export interface CanteenOrder {
@@ -481,6 +495,18 @@ export interface Receipt {
     partyName: string; // The other person/entity in the transaction
     items: { name: string; quantity: number; price: number }[];
 }
+
+export interface DeliveryNotification {
+  id: string;
+  orderId: string;
+  studentId: string;
+  studentName: string;
+  shopId: string;
+  tableNumber: string;
+  timestamp: number;
+  status: 'pending' | 'served';
+}
+
 
 // --- System Security ---
 export interface IpWhitelistSettings {

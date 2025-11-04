@@ -1,4 +1,4 @@
-import { CanteenShop, CanteenCategory, CanteenMenuItem, CanteenOrder, User, CanteenSettings, PaymentMethod, EWalletTransaction } from '../types';
+import { CanteenShop, CanteenCategory, CanteenMenuItem, CanteenOrder, User, CanteenSettings, PaymentMethod, EWalletTransaction, DeliveryNotification } from '../types';
 import * as eWalletService from './eWalletService';
 import { findUserById } from './groupService';
 import { createReceipt } from './receiptService';
@@ -8,6 +8,7 @@ const CATEGORIES_KEY = '360_smart_school_canteen_categories';
 const MENU_ITEMS_KEY = '360_smart_school_canteen_menu_items';
 const ORDERS_KEY = '360_smart_school_canteen_orders';
 const CANTEEN_SETTINGS_KEY = '360_smart_school_canteen_settings';
+const DELIVERY_NOTIFICATIONS_KEY = '360_smart_school_delivery_notifications';
 
 // --- Helper Functions ---
 export const getShops = (): CanteenShop[] => JSON.parse(localStorage.getItem(SHOPS_KEY) || '[]');
@@ -23,17 +24,39 @@ const saveOrders = (orders: CanteenOrder[]) => localStorage.setItem(ORDERS_KEY, 
 const getSettings = (): Record<string, CanteenSettings> => JSON.parse(localStorage.getItem(CANTEEN_SETTINGS_KEY) || '{}');
 const saveSettings = (settings: Record<string, CanteenSettings>) => localStorage.setItem(CANTEEN_SETTINGS_KEY, JSON.stringify(settings));
 
+// Helpers for delivery notifications.
+const getDeliveryNotifications = (): DeliveryNotification[] => JSON.parse(localStorage.getItem(DELIVERY_NOTIFICATIONS_KEY) || '[]');
+const saveDeliveryNotifications = (notifications: DeliveryNotification[]) => localStorage.setItem(DELIVERY_NOTIFICATIONS_KEY, JSON.stringify(notifications));
+
+
 // --- Canteen Settings Management ---
 export const getCanteenSettings = (schoolId: string): CanteenSettings => {
     const allSettings = getSettings();
-    if (allSettings[schoolId]) {
-        return allSettings[schoolId];
-    }
-    // Return default if not found
-    return {
+    const savedSchoolSettings = allSettings[schoolId];
+
+    const defaultSettings: CanteenSettings = {
         schoolId,
         activePaymentMethod: 'e_wallet',
+        seatSettings: {
+            totalStudents: 0,
+            breakfastMinutes: 30,
+            tables: [],
+        },
     };
+
+    if (savedSchoolSettings) {
+        // Merge to ensure new properties are added if they don't exist in storage
+        return {
+            ...defaultSettings,
+            ...savedSchoolSettings,
+            seatSettings: {
+                ...defaultSettings.seatSettings,
+                ...(savedSchoolSettings.seatSettings || {}),
+            },
+        };
+    }
+    
+    return defaultSettings;
 };
 
 export const saveCanteenSettings = (settings: CanteenSettings): void => {
@@ -260,6 +283,22 @@ export const placeOrder = (
     const orders = getOrders();
     orders.push(newOrder);
     saveOrders(orders);
+
+    if (deliveryMethod === 'delivery' && deliveryDetails) {
+        const notifications = getDeliveryNotifications();
+        const newNotification: DeliveryNotification = {
+            id: `del_notif_${Date.now()}`,
+            orderId: newOrder.id,
+            studentId: studentId,
+            studentName: student.name,
+            shopId: shopId,
+            tableNumber: deliveryDetails,
+            timestamp: Date.now(),
+            status: 'pending'
+        };
+        notifications.push(newNotification);
+        saveDeliveryNotifications(notifications);
+    }
     
     return newOrder;
 };
@@ -390,4 +429,17 @@ export const seedInitialCanteenData = (schoolId: string): CanteenShop => {
     addMenuItem({ shopId: shop.id, categoryId: lunchCat.id, name: "Rice & Chicken Stew", description: "Friday special.", price: 5000, imageUrl: 'https://picsum.photos/seed/rice/200', isAvailable: true });
 
     return shop;
+};
+
+export const getDeliveryNotificationsForShop = (shopId: string): DeliveryNotification[] => {
+    return getDeliveryNotifications().filter(n => n.shopId === shopId).sort((a,b) => a.timestamp - b.timestamp);
+};
+
+export const markNotificationAsServed = (notificationId: string): void => {
+    const notifications = getDeliveryNotifications();
+    const index = notifications.findIndex(n => n.id === notificationId);
+    if (index > -1) {
+        notifications[index].status = 'served';
+        saveDeliveryNotifications(notifications);
+    }
 };
