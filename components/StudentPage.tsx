@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, Module, ExtractedUnebSlipData, UnebPassSlip, AdmissionSettings, AdminUser, School, CustomIdTemplate, CanteenShop, InternalExamResult, SchoolClass, StudentTransferProposal, TransferNegotiation, CompletedAdmission } from '../types';
 import { APP_TITLE } from '../constants';
 import NotificationBell from './NotificationBell';
 import { getAllSchools, getOpenMarketProposals, getProposalsForSchool, getNegotiationsForSchool, startOrGetNegotiation } from '../services/schoolService';
-import { getAllModules, SMART_ADMISSION_MODULE_NAME, MESSAGE_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, EXPLORATION_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, NEWS_FEED_MODULE_NAME } from '../services/moduleService';
+import { getAllModules, SMART_ADMISSION_MODULE_NAME, MESSAGE_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, EXPLORATION_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, NEWS_FEED_MODULE_NAME, E_VOTE_MODULE_NAME } from '../services/moduleService';
 import * as settingsService from '../services/settingsService';
 import { isUnebVerificationEnabled } from '../services/systemSettingsService';
 import { extractTextFromImageWithGoogle, getNewsFromAI } from '../services/apiService';
@@ -32,6 +33,7 @@ import UserAvatar from './UserAvatar';
 import StudentTransferMarketplace from './StudentTransferMarketplace';
 import SchoolLandingPage from './SchoolLandingPage';
 import * as chatService from '../services/chatService';
+import EVoteStudentPage from './EVoteStudentPage';
 
 
 // Tell typescript html2canvas exists globally
@@ -1440,9 +1442,9 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
         );
     };
 
-    const renderMainContent = () => {
-        const activeModule = availableModules.find(m => m.id === currentView);
+    const activeModule = availableModules.find(m => m.id === currentView);
 
+    const renderMainContent = () => {
         if (currentUser.pendingTransferAcceptance) {
             return <div>TRANSFER PENDING</div>
         }
@@ -1479,6 +1481,9 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
         }
         if (activeModule?.name === STUDENT_TRANSFER_MODULE_NAME && school) {
             return <div>TRANSFER MARKET</div>
+        }
+        if (activeModule?.name === E_VOTE_MODULE_NAME && school) {
+            return <EVoteStudentPage user={currentUser} school={school} />;
         }
         
         if (activeModule?.name === SMART_STUDENT_ID_MODULE_NAME) {
@@ -1529,7 +1534,6 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
         { id: 'my-results', name: 'My Results', icon: <ResultsIcon /> },
     ];
 
-    const activeModule = availableModules.find(m => m.id === currentView);
     const isOnlineFeedView = activeModule?.name === ONLINE_MODULE_NAME;
 
     return (
@@ -1684,56 +1688,4 @@ const NewsFeedView: React.FC = () => {
                     </div>
                 </div>
             )}
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">News Feed</h2>
-            <div className="flex items-center gap-2 p-1 bg-gray-800 rounded-lg mb-6 overflow-x-auto">
-                {categories.map(cat => (
-                    <button
-                        key={cat}
-                        onClick={() => setActiveCategory(cat)}
-                        className={`px-4 py-2 text-sm font-semibold rounded-md whitespace-nowrap ${activeCategory === cat ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}
-                    >
-                        {cat}
-                    </button>
-                ))}
-            </div>
-
-            {error && <div className="bg-red-500/20 text-red-300 p-4 rounded-lg text-center">{error}</div>}
-
-            <div className="space-y-6">
-                {isLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                        <div key={i} className="bg-gray-800 rounded-lg animate-pulse overflow-hidden">
-                            <div className="h-48 bg-gray-700"></div>
-                            <div className="p-4">
-                                <div className="h-6 bg-gray-700 rounded w-3/4 mb-4"></div>
-                                <div className="h-4 bg-gray-700 rounded w-full mb-2"></div>
-                                <div className="h-4 bg-gray-700 rounded w-5/6"></div>
-                            </div>
-                        </div>
-                    ))
-                ) : (
-                    news.map((story, index) => (
-                        <div key={index} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-                            <img 
-                                src={story.imageUrl} 
-                                alt={story.title} 
-                                className="w-full h-48 object-cover"
-                                onError={(e) => { e.currentTarget.src = 'https://picsum.photos/seed/news-fallback/600/300'; }}
-                            />
-                            <div className="p-4">
-                                <h3 className="font-bold text-lg text-white mb-2">{story.title}</h3>
-                                <p className="text-gray-300 text-sm mb-4">{story.summary}</p>
-                                <button
-                                    onClick={() => setViewingUrl(story.url)}
-                                    className="text-sm font-semibold text-cyan-400 hover:underline"
-                                >
-                                    Read More &rarr;
-                                </button>
-                            </div>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
-    );
-};
+            <h2 className="text-2xl sm:text-3xl font

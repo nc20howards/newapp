@@ -585,50 +585,86 @@ export interface TransferNegotiation {
     content: string;
     timestamp: number;
   }[];
-  status: 'active' | 'accepted' | 'payment_made' | 'students_assigned' | 'completed' | 'rejected';
+  status: 'active' | 'accepted' | 'payment_made' | 'completed' | 'rejected';
   lastUpdated: number;
-  agreedPricePerStudent?: number;
-  assignedStudents?: { studentId: string; status: 'pending' | 'accepted' | 'rejected' }[];
+  assignedStudents?: { studentId: string; studentName: string; }[];
+  totalPrice?: number;
 }
 
-// --- Events Module ---
+
 export interface Place {
   title: string;
   uri: string;
 }
 
-export interface Event {
-  id: string;
-  schoolId: string;
-  title: string;
-  description: string;
-  attachments?: { name: string; dataUrl: string; type: string; }[];
-  bannerUrl: string;
-  logoUrl: string;
-  startTime: number;
-  endTime: number;
-  place: Place;
-  createdBy: string;
-  createdAt: number;
-}
 
-// --- Marketplace Module ---
 export interface MarketplaceMedia {
-  type: 'image' | 'video';
-  url: string; // data URL
+    type: 'image' | 'video';
+    url: string;
 }
 
 export interface MarketplaceListing {
+    id: string;
+    sellerId: string;
+    sellerName: string;
+    sellerAvatar?: string;
+    title: string;
+    description: string;
+    price: number;
+    category: 'Electronics' | 'Clothing' | 'Books' | 'Furniture' | 'Services' | 'Other';
+    condition: 'new' | 'used';
+    location: string;
+    media: MarketplaceMedia[];
+    createdAt: number;
+    status: 'available' | 'sold' | 'pending';
+}
+
+export interface Event {
+    id: string;
+    schoolId: string;
+    createdBy: string; // userId of creator
+    title: string;
+    description: string;
+    startTime: number; // timestamp
+    endTime: number; // timestamp
+    bannerUrl: string;
+    logoUrl: string;
+    place: Place;
+    createdAt: number;
+    attachments?: ChatAttachment[];
+}
+
+
+// --- E-Vote Module ---
+export interface ElectionSettings {
+  schoolId: string;
+  startTime: number; // timestamp
+  endTime: number; // timestamp
+  isVotingOpen: boolean;
+}
+
+export interface VotingCategory {
   id: string;
-  sellerId: string;
-  sellerName: string;
-  sellerAvatar?: string;
+  schoolId: string;
   title: string;
-  description: string;
-  price: number;
-  category: 'Electronics' | 'Clothing' | 'Books' | 'Furniture' | 'Services' | 'Other';
-  condition: 'new' | 'used';
-  location: string;
-  media: MarketplaceMedia[];
-  createdAt: number;
+  order: number;
+}
+
+export interface Contestant {
+  id: string;
+  schoolId: string;
+  categoryId: string;
+  name: string;
+  nickname?: string;
+  avatarUrl?: string;
+  class: string;
+  manifesto: string;
+  votes: number;
+}
+
+export interface VoteRecord {
+  studentId: string;
+  schoolId: string;
+  timestamp: number;
+  choices: Record<string, string>; // { [categoryId]: contestantId }
 }

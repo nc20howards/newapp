@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 // FIX: Added UnebResultEntry and CustomIdTemplate to imports for use in the new UNEB admin components and Smart ID editor.
 import { AdminUser, School, Module, User as SchoolUser, AuditLogEntry, UnebPassSlip, UnebStats, CustomIdTemplate, SchoolUserRole, ExtractedUnebSlipData, AdmissionSettings, CompletedAdmission, PinResetRequest, SchoolClass, SmartIDSettings, CustomIdField, IpWhitelistSettings, StudentTransferProposal, TransferNegotiation, SchoolALevelCombination } from '../types';
 import { getAllSchools, activateModuleForSchool, deactivateModuleForSchool, publishModuleForSchool, unpublishModuleForSchool, publishHomePage, unpublishHomePage } from '../services/schoolService';
-import { getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, MESSAGE_MODULE_NAME, EXPLORATION_MODULE_NAME } from '../services/moduleService';
+import { getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, MESSAGE_MODULE_NAME, EXPLORATION_MODULE_NAME, E_VOTE_MODULE_NAME } from '../services/moduleService';
 import * as studentService from '../services/studentService';
 import { extractTextFromImageWithGoogle } from '../services/apiService';
 // FIX: Imported UNEB service functions for use in the new UNEB admin components.
@@ -36,6 +36,7 @@ import StudentTransferMarketplace from './StudentTransferMarketplace';
 import ConfirmationModal from './ConfirmationModal';
 import ExplorationPage from './ExplorationPage';
 import { createBroadcastNotification } from '../services/notificationService';
+import EVoteAdminPage from './EVoteAdminPage';
 
 // --- TYPE DEFINITIONS for Smart Admission ---
 type KioskView = 'main' | 'index' | 'scan';
@@ -98,6 +99,7 @@ const moduleNameToViewMap: Record<string, string> = {
     [MESSAGE_MODULE_NAME]: 'messages',
     [ONLINE_MODULE_NAME]: 'online_feed',
     [EXPLORATION_MODULE_NAME]: 'exploration',
+    [E_VOTE_MODULE_NAME]: 'e_vote',
 };
 
 
@@ -1437,6 +1439,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onLogout }) => {
                 if (view === 'exploration') {
                     return <ExplorationPage user={compatibleUser as any} />;
                 }
+                if (view === 'e_vote') {
+                    return <EVoteAdminPage school={schoolForHeadteacher} user={user} />;
+                }
                 return <HeadteacherDashboardView school={schoolForHeadteacher} students={students} activeModules={activeModules} />;
             case 'uneb_admin':
                 if (view === 'upload') {
@@ -1503,7 +1508,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onLogout }) => {
                     <nav className="space-y-2">
                         {navItems.map(item => (
                             <button key={item.view} onClick={() => { setView(item.view); setIsSidebarCollapsed(true); }} title={item.name}
-                                className={`w-full flex items-center space-x-3 p-3 rounded-md transition-colors ${view === item.view ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}>
+                                className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${view === item.view ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}>
                                 {item.icon}
                                 {!isSidebarCollapsed && <span>{item.name}</span>}
                             </button>
@@ -1553,7 +1558,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onLogout }) => {
                         <nav className="space-y-2 flex-grow">
                             {navItems.map(item => (
                                 <button key={item.view} onClick={() => { setView(item.view); setIsSidebarOpen(false); }}
-                                    className={`w-full flex items-center space-x-3 p-3 rounded-md transition-colors ${view === item.view ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}>
+                                    className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors ${view === item.view ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}>
                                     {item.icon}<span>{item.name}</span>
                                 </button>
                             ))}

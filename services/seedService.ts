@@ -1,6 +1,6 @@
 import { registerSchool, getAllSchools } from './schoolService';
 import { createAdminUser, getAllAdminUsers } from './userService';
-import { createModule, getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, MESSAGE_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, EXPLORATION_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, NEWS_FEED_MODULE_NAME } from './moduleService';
+import { createModule, getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, MESSAGE_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, EXPLORATION_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, NEWS_FEED_MODULE_NAME, E_VOTE_MODULE_NAME } from './moduleService';
 import { createSchoolUser, assignSellerToShop } from './studentService';
 // FIX: Changed UnebResultEntry to UnebPassSlip to match the type exported from `types` and updated the seed data structure accordingly.
 import { UnebPassSlip, Module, School, User } from '../types';
@@ -165,6 +165,7 @@ export const seedInitialData = () => {
             { name: EXPLORATION_MODULE_NAME, description: 'Brings subjects to life with interactive 3D/AR content. Students can explore virtual models, historical scenes, and more.', isAssignable: true },
             { name: STUDENT_TRANSFER_MODULE_NAME, description: 'A marketplace for schools to request or propose the transfer of students to manage capacity.', isAssignable: true },
             { name: NEWS_FEED_MODULE_NAME, description: 'Provides students with a feed of the latest news, summarized by AI from Google Search.', isAssignable: true },
+            { name: E_VOTE_MODULE_NAME, description: 'Facilitates democratic student elections with live result tracking.', isAssignable: true },
         ];
 
         // Get the current list of modules from storage.
@@ -230,16 +231,17 @@ export const seedInitialData = () => {
         const explorationModule = modules.find(m => m.name === EXPLORATION_MODULE_NAME);
         const studentTransferModule = modules.find(m => m.name === STUDENT_TRANSFER_MODULE_NAME);
         const newsFeedModule = modules.find(m => m.name === NEWS_FEED_MODULE_NAME);
+        const eVoteModule = modules.find(m => m.name === E_VOTE_MODULE_NAME);
 
 
-        if (!homePageModule || !smartAdmissionModule || !messageModule || !eWalletModule || !onlineModule || !smartStudentIdModule || !eCanteenModule || !ncheModule || !explorationModule || !studentTransferModule || !newsFeedModule) {
+        if (!homePageModule || !smartAdmissionModule || !messageModule || !eWalletModule || !onlineModule || !smartStudentIdModule || !eCanteenModule || !ncheModule || !explorationModule || !studentTransferModule || !newsFeedModule || !eVoteModule) {
             throw new Error("Core modules are missing, cannot proceed with school seeding.");
         }
 
         // --- Create Schools and Assign Modules ---
         // Note: The Home Page module is now added automatically by registerSchool.
         // We only need to pass the other modules we want to assign.
-        const school1Modules = [smartAdmissionModule.id, messageModule.id, eWalletModule.id, onlineModule.id, smartStudentIdModule.id, eCanteenModule.id, ncheModule.id, explorationModule.id, studentTransferModule.id, newsFeedModule.id];
+        const school1Modules = [smartAdmissionModule.id, messageModule.id, eWalletModule.id, onlineModule.id, smartStudentIdModule.id, eCanteenModule.id, ncheModule.id, explorationModule.id, studentTransferModule.id, newsFeedModule.id, eVoteModule.id];
         
         const school1 = registerSchool({
             name: 'Northwood High School',
@@ -387,6 +389,7 @@ export const seedInitialData = () => {
         // --- Seed Marketplace Data ---
         if (getListings().length === 0) {
             console.log('Seeding marketplace listings...');
+            // FIX: Added missing 'status' property to satisfy the MarketplaceListing type.
             createListing({
                 sellerId: 'S001',
                 sellerName: 'Alice Johnson',
@@ -398,7 +401,9 @@ export const seedInitialData = () => {
                 condition: 'used',
                 location: 'Northwood High Campus',
                 media: [{ type: 'image', url: 'https://picsum.photos/seed/physics-book/800/600' }],
+                status: 'available',
             });
+            // FIX: Added missing 'status' property to satisfy the MarketplaceListing type.
             createListing({
                 sellerId: 'S002',
                 sellerName: 'Bob Williams',
@@ -410,7 +415,9 @@ export const seedInitialData = () => {
                 condition: 'used',
                 location: 'Green Valley Academy',
                 media: [{ type: 'image', url: 'https://picsum.photos/seed/calculator/800/600' }],
+                status: 'available',
             });
+            // FIX: Added missing 'status' property to satisfy the MarketplaceListing type.
             createListing({
                 sellerId: 'teacher1',
                 sellerName: 'Mr. John Smith',
@@ -422,7 +429,9 @@ export const seedInitialData = () => {
                 condition: 'new',
                 location: 'Online / Northwood Campus',
                 media: [{ type: 'image', url: 'https://picsum.photos/seed/tutoring/800/600' }],
+                status: 'available',
             });
+            // FIX: Added missing 'status' property to satisfy the MarketplaceListing type.
             createListing({
                 sellerId: 'S003',
                 sellerName: 'Charlie Brown',
@@ -434,6 +443,7 @@ export const seedInitialData = () => {
                 condition: 'used',
                 location: 'Green Valley Academy',
                 media: [{ type: 'image', url: 'https://picsum.photos/seed/blazer/800/600' }],
+                status: 'available',
             });
         }
 

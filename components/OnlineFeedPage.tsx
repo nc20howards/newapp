@@ -78,7 +78,7 @@ const IconSchedule = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-
 const IconLike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.085a2 2 0 00-1.736.93L5.5 8m7 2v5m0 0v5m0-5h5" /></svg>;
 const IconDislike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.085a2 2 0 001.736-.93l2.5-4m-7 2v-5m0 0V5m0 5h5" /></svg>;
 const IconComment = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>;
-const IconCopyLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
+const IconCopyLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
 const IconEye = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
 const IconLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>;
 
@@ -92,6 +92,15 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
 
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
+
+    const isInternalProductLink = (url: string): boolean => {
+        try {
+            const urlObj = new URL(url, window.location.origin);
+            return urlObj.origin === window.location.origin && urlObj.hash.startsWith('#/marketplace/view/listing/');
+        } catch {
+            return url.startsWith('#/marketplace/view/listing/');
+        }
+    };
 
     const saveSelection = () => {
         const selection = window.getSelection();
@@ -156,25 +165,23 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
         editorRef.current.focus();
         restoreSelection();
         
-        // Use execCommand to create the link
         document.execCommand('createLink', false, linkUrl);
         
-        // Find the newly created link and apply button styles
         const selection = window.getSelection();
         if (selection && selection.focusNode) {
             let parentElement = selection.focusNode.parentElement;
-            // Traverse up to find the <a> tag
             while (parentElement && parentElement.tagName !== 'A') {
                 parentElement = parentElement.parentElement;
             }
             if (parentElement && parentElement.tagName === 'A') {
-                // Apply Tailwind classes for a button-like appearance
                 parentElement.className = "bg-cyan-600 text-white px-3 py-1 rounded-full inline-block text-sm font-semibold no-underline hover:bg-cyan-700 transition-colors shadow-md";
                 
-                // Handle external links to open in a new tab
-                if (!linkUrl.startsWith('#/') && !linkUrl.startsWith(window.location.origin)) {
+                if (!isInternalProductLink(linkUrl)) {
                     parentElement.setAttribute('target', '_blank');
                     parentElement.setAttribute('rel', 'noopener noreferrer');
+                } else {
+                    const urlObj = new URL(linkUrl, window.location.origin);
+                    parentElement.setAttribute('href', urlObj.hash);
                 }
             }
         }
@@ -246,16 +253,15 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
-        const urlRegex = /(https?:\/\/[^\s]+|#\/marketplace\/view\/listing\/[^\s]+)/g;
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
 
         const sanitizedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
         
         const linkedText = sanitizedText.replace(urlRegex, (url) => {
-            if (url.startsWith('#/')) {
-                // Internal link, handled by PostRenderer's click handler
-                return `<a href="${url}" style="color: #22d3ee;">${url}</a>`;
+            if (isInternalProductLink(url)) {
+                const urlObj = new URL(url, window.location.origin);
+                return `<a href="${urlObj.hash}" style="color: #22d3ee;">${url}</a>`;
             } else {
-                // External link, opens in a new tab
                 return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #22d3ee;">${url}</a>`;
             }
         });
@@ -395,7 +401,7 @@ const PostRenderer: React.FC<{ content: string; onInternalLinkClick: (path: stri
     const sanitizedContent = useMemo(() => {
         const DOMPurify = (window as any).DOMPurify;
         if (!DOMPurify) return content;
-        return DOMPurify.sanitize(content, { ADD_ATTR: ['target', 'rel', 'style'], ADD_TAGS: ['video'], ADD_CLASSES: { 'a': true } });
+        return DOMPurify.sanitize(content, { ADD_ATTR: ['target', 'rel', 'style', 'class'], ADD_TAGS: ['video'], ADD_CLASSES: { 'a': true } });
     }, [content]);
 
     const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -405,13 +411,23 @@ const PostRenderer: React.FC<{ content: string; onInternalLinkClick: (path: stri
             target = target.parentElement;
         }
 
-        if (target.tagName === 'A') {
+        if (target && target.tagName === 'A') {
             const anchor = target as HTMLAnchorElement;
             const href = anchor.getAttribute('href');
 
-            if (href && href.startsWith('#/marketplace/view/listing/')) {
-                e.preventDefault();
-                onInternalLinkClick(href);
+            if (href) {
+                try {
+                    const url = new URL(href, window.location.origin);
+                    if (url.origin === window.location.origin && url.hash.startsWith('#/marketplace/view/listing/')) {
+                        e.preventDefault();
+                        onInternalLinkClick(url.hash);
+                    }
+                } catch (error) {
+                    if (href.startsWith('#/marketplace/view/listing/')) {
+                        e.preventDefault();
+                        onInternalLinkClick(href);
+                    }
+                }
             }
         }
     };
@@ -1031,20 +1047,11 @@ const MapPreviewModal: React.FC<{ url: string; onClose: () => void; }> = ({ url,
     );
 };
 
-const AddStoryModal: React.FC<{ user: User | AdminUser; onClose: () => void; onStoryPosted: () => void; }> = ({ user, onClose, onStoryPosted }) => {
-    // ... Implementation for Add Story modal ...
+const AddStoryModal: React.FC<{ user: User | AdminUser; onClose: () => void; onStoryPosted: () => void; }> = ({ onClose }) => {
     return <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[110] p-4"><div className="bg-gray-800 rounded-lg p-4"><p>Add Story modal coming soon.</p><button onClick={onClose}>Close</button></div></div>;
 };
 
-const StoryViewer: React.FC<{
-    initialUser: User | AdminUser;
-    allUsersWithStories: (User | AdminUser)[];
-    storiesByUser: Record<string, Story[]>;
-    onClose: () => void;
-    currentUserId: string;
-    onStoryUpdate: () => void;
-}> = ({ onClose }) => {
-    // ... Implementation for Story Viewer ...
+const StoryViewer: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
     return <div className="fixed inset-0 bg-black/90 flex justify-center items-center z-[110] p-4"><div className="bg-gray-800 rounded-lg p-4"><p>Story Viewer coming soon.</p><button onClick={onClose}>Close</button></div></div>;
 };
 
@@ -1462,22 +1469,21 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
     const viewedPostsRef = useRef(new Set<string>());
 
     const handleInternalLinkClick = (path: string) => {
-        window.location.hash = path;
+        const listingId = path.split('/').pop();
+        if (listingId) {
+            const listing = marketplaceService.getListingById(listingId);
+            if (listing) {
+                setViewingListing(listing);
+            }
+        }
     };
 
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash;
             if (hash.startsWith('#/marketplace/view/listing/')) {
-                const listingId = hash.split('/').pop();
-                if (listingId) {
-                    const listing = marketplaceService.getListingById(listingId);
-                    if (listing) {
-                        setView('marketplace');
-                        setViewingListing(listing);
-                        window.history.replaceState("", document.title, window.location.pathname + window.location.search);
-                    }
-                }
+                handleInternalLinkClick(hash);
+                window.history.replaceState("", document.title, window.location.pathname + window.location.search);
             }
         };
 
@@ -1563,7 +1569,11 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
         const target = findFullUserById(targetUserId);
         if (target) {
             setProfileModalUser(null);
-            setChatTarget(target);
+            if (onStartMessage) { // If OnlineFeed is embedded in another page
+                onStartMessage(targetUserId);
+            } else { // If it's a standalone page
+                setChatTarget(target);
+            }
         }
     };
     
@@ -1693,136 +1703,98 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                                                 <UserAvatar name={storyUser.name} avatarUrl={storyUser.avatarUrl} className="w-14 h-14 rounded-full" />
                                             </div>
                                         </div>
-                                        <p className="text-xs text-white truncate w-full text-center">{storyUser.name.split(' ')[0]}</p>
+                                        <p className="text-xs text-gray-400 truncate w-full">{storyUser.name.split(' ')[0]}</p>
                                     </div>
                                 ))}
                             </div>
                         </div>
-
-                        <PostComposer user={currentUser!} onPost={handlePost} />
-
-                        {feedPosts.filter(post => !hiddenPostIds.has(post.id) && !post.isDeleted).map(post => {
-                            const isAuthor = post.authorId === currentUserId;
-                            const isEditing = editingPostId === post.id;
-                            const userHasLiked = post.reactions?.['👍']?.includes(currentUserId);
-                            const userHasDisliked = post.reactions?.['👎']?.includes(currentUserId);
+                        {currentUser && <PostComposer user={currentUser} onPost={handlePost} />}
+                        
+                        {feedPosts.filter(p => !hiddenPostIds.has(p.id)).map(post => {
+                            const isLongPost = post.content.length > 500;
                             const isExpanded = expandedPosts.has(post.id);
-                            
-                            const tempDiv = document.createElement("div");
-                            tempDiv.innerHTML = post.content;
-                            const postTextContent = tempDiv.textContent || tempDiv.innerText || "";
-                            const isLongPost = postTextContent.length > 350;
 
                             return (
-                                <div key={post.id} ref={postObserverRef} data-post-id={post.id} className="bg-gray-800 p-4 rounded-lg shadow-md relative">
-                                    <div className="flex items-start gap-3 mb-3">
-                                        <div onClick={() => handleAvatarClick(post.authorId)} className="cursor-pointer">
-                                            <UserAvatar name={post.authorName} avatarUrl={post.authorAvatar} className="w-10 h-10 rounded-full flex-shrink-0" />
+                                <div key={post.id} ref={postObserverRef} data-post-id={post.id} className="bg-gray-800 rounded-lg shadow-lg">
+                                    <div className="p-4">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleAvatarClick(post.authorId)}>
+                                                <UserAvatar name={post.authorName} avatarUrl={post.authorAvatar} className="w-12 h-12 rounded-full" />
+                                                <div>
+                                                    <p className="font-bold text-white">{post.authorName}</p>
+                                                    <p className="text-xs text-gray-400">{timeSince(post.timestamp)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="relative">
+                                                <button onClick={() => setOpenMenuId(post.id)} className="p-2 text-gray-400 hover:text-white rounded-full">&hellip;</button>
+                                                {openMenuId === post.id && (
+                                                    <div ref={menuRef} className="absolute top-full right-0 mt-1 w-40 bg-gray-700 border border-gray-600 rounded-md shadow-lg z-20 text-sm">
+                                                        {post.authorId === currentUserId ? (
+                                                            <>
+                                                                <button onClick={() => handleEdit(post)} className="w-full text-left px-3 py-2 hover:bg-gray-600">Edit Post</button>
+                                                                <button onClick={() => handleDelete(post)} className="w-full text-left px-3 py-2 text-red-400 hover:bg-gray-600">Delete Post</button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <button onClick={() => handleHide(post.id)} className="w-full text-left px-3 py-2 hover:bg-gray-600">Hide Post</button>
+                                                                <button onClick={handleReport} className="w-full text-left px-3 py-2 hover:bg-gray-600">Report Post</button>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="flex-grow">
-                                            <p onClick={() => handleAvatarClick(post.authorId)} className="font-bold cursor-pointer">{post.authorName}</p>
-                                            <p className="text-xs text-gray-400">{timeSince(post.timestamp)}</p>
-                                        </div>
-                                        <div className="relative">
-                                            <button onClick={() => setOpenMenuId(post.id)} className="p-2 rounded-full text-gray-400 hover:bg-gray-700">
-                                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" /></svg>
-                                            </button>
-                                            {openMenuId === post.id && (
-                                                <div ref={menuRef} className="absolute top-full right-0 mt-1 w-40 bg-gray-700 border border-gray-600 rounded-md shadow-lg z-20 text-sm">
-                                                    {isAuthor && <button onClick={() => handleEdit(post)} className="w-full text-left px-3 py-2 hover:bg-gray-600">Edit Post</button>}
-                                                    <button onClick={() => handleHide(post.id)} className="w-full text-left px-3 py-2 hover:bg-gray-600">Hide</button>
-                                                    {!isAuthor && <button onClick={handleReport} className="w-full text-left px-3 py-2 hover:bg-gray-600">Report</button>}
-                                                    {isAuthor && <button onClick={() => handleDelete(post)} className="w-full text-left px-3 py-2 text-red-400 hover:bg-gray-600">Delete</button>}
+
+                                        <div className={`mt-4 ${isLongPost && !isExpanded ? 'max-h-40 overflow-hidden relative' : ''}`}>
+                                            <PostRenderer content={post.content} onInternalLinkClick={handleInternalLinkClick} />
+                                            {isLongPost && !isExpanded && (
+                                                <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-gray-800 to-transparent">
+                                                    <button onClick={() => toggleReadMore(post.id)} className="absolute bottom-0 left-1/2 -translate-x-1/2 text-cyan-400 font-semibold text-sm">See More</button>
                                                 </div>
                                             )}
+                                        </div>
+                                         {isLongPost && isExpanded && <button onClick={() => toggleReadMore(post.id)} className="text-cyan-400 font-semibold text-sm mt-2">See Less</button>}
+                                    </div>
+
+                                    <div className="px-4 py-2 flex justify-between items-center text-sm text-gray-400 border-b border-gray-700">
+                                        <div className="flex items-center gap-1">
+                                            {post.reactions && Object.keys(post.reactions).length > 0 &&
+                                                <>{/* FIX: Added explicit type for userIds to resolve TS error */}
+                                                {Object.entries(post.reactions).filter(([, userIds]: [string, string[]]) => userIds.length > 0).slice(0, 3).map(([emoji]) => <span key={emoji}>{emoji}</span>)}
+                                                <span className="ml-1">{/* FIX: Replaced reduce().concat() with flat() to robustly flatten the array of reaction user lists and get the total count. The cast is necessary due to potential type inference issues. */ (Object.values(post.reactions) as string[][]).flat().length}</span>
+                                                </>
+                                            }
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span>{comments[post.id]?.length || 0} Comments</span>
+                                            <span>{post.views || 0} Views</span>
                                         </div>
                                     </div>
                                     
-                                    {isEditing ? (
-                                        <div>
-                                            <div
-                                                contentEditable="true"
-                                                suppressContentEditableWarning={true}
-                                                onInput={e => setEditingContent(e.currentTarget.innerHTML)}
-                                                className="w-full bg-gray-700 p-3 rounded-lg min-h-[84px] focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                                                dangerouslySetInnerHTML={{ __html: editingContent }}
-                                            />
-                                            <div className="flex justify-end gap-2 mt-2">
-                                                <button onClick={() => setEditingPostId(null)} className="px-3 py-1 bg-gray-600 rounded-md text-xs">Cancel</button>
-                                                <button onClick={handleSaveEdit} className="px-3 py-1 bg-cyan-600 rounded-md text-xs">Save</button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <PostRenderer content={post.content} onInternalLinkClick={handleInternalLinkClick} />
-                                            {isLongPost && (
-                                                <button onClick={() => toggleReadMore(post.id)} className="text-cyan-400 hover:underline text-sm mt-2">
-                                                    {isExpanded ? 'See less' : 'See more'}
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="mt-3 flex justify-between items-center text-sm text-gray-400">
-                                        <div className="flex items-center gap-2">
-                                            {(post.reactions && Object.keys(post.reactions).length > 0) && (
-                                                <div className="flex items-center">
-                                                    {Object.entries(post.reactions).map(([emoji, userIds]) =>
-                                                        (userIds as string[]).length > 0 && <span key={emoji} className="-ml-1">{emoji}</span>
-                                                    )}
-                                                    <span className="ml-2">{Object.values(post.reactions).reduce((acc: number, val) => acc + (val as string[]).length, 0)}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            {(comments[post.id]?.length || 0) > 0 && (
-                                                <button onClick={() => handleCommentClick(post.id)} className="hover:underline">
-                                                    {comments[post.id].length} comment{comments[post.id].length > 1 ? 's' : ''}
-                                                </button>
-                                            )}
-                                            <div className="flex items-center gap-1.5">
-                                                <IconEye />
-                                                <span>{post.views || 0}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-2 pt-2 border-t border-gray-700 flex justify-around">
-                                        <button onClick={() => handleToggleReaction(post.id, '👍')} className={`flex items-center justify-center w-full py-2 rounded-md transition-colors ${userHasLiked ? 'text-cyan-400' : 'text-gray-400 hover:bg-gray-700'}`}>
-                                            <IconLike /> <span className="hidden sm:inline ml-1.5">Like</span>
-                                        </button>
-                                        <button onClick={() => handleToggleReaction(post.id, '👎')} className={`flex items-center justify-center w-full py-2 rounded-md transition-colors ${userHasDisliked ? 'text-red-400' : 'text-gray-400 hover:bg-gray-700'}`}>
-                                            <IconDislike /> <span className="hidden sm:inline ml-1.5">Dislike</span>
-                                        </button>
-                                        <button onClick={() => handleCommentClick(post.id)} className="flex items-center justify-center w-full py-2 rounded-md text-gray-400 hover:bg-gray-700">
-                                            <IconComment /> <span className="hidden sm:inline ml-1.5">Comment</span>
-                                        </button>
-                                        <button onClick={() => alert('Share functionality is coming soon!')} className="flex items-center justify-center w-full py-2 rounded-md text-gray-400 hover:bg-gray-700">
-                                            <IconCopyLink /> <span className="hidden sm:inline ml-1.5">Share</span>
-                                        </button>
+                                    <div className="p-2 flex justify-around text-sm font-semibold text-gray-400 border-b border-gray-700">
+                                        <button onClick={() => handleToggleReaction(post.id, '👍')} className={`flex items-center gap-2 p-2 rounded-md hover:bg-gray-700 w-full justify-center ${post.reactions?.['👍']?.includes(currentUserId) ? 'text-cyan-400' : ''}`}><IconLike /> Like</button>
+                                        <button onClick={() => handleCommentClick(post.id)} className={`flex items-center gap-2 p-2 rounded-md hover:bg-gray-700 w-full justify-center ${commentingOnPostId === post.id ? 'text-cyan-400' : ''}`}><IconComment /> Comment</button>
+                                        <button className="flex items-center gap-2 p-2 rounded-md hover:bg-gray-700 w-full justify-center"><IconCopyLink /> Share</button>
                                     </div>
 
                                     {commentingOnPostId === post.id && (
-                                        <div className="mt-3 pt-3 border-t border-gray-700 space-y-3">
+                                        <div className="p-4 space-y-3">
+                                            <div className="flex items-start gap-3">
+                                                <UserAvatar name={currentUser!.name} avatarUrl={currentUser!.avatarUrl} className="w-8 h-8 rounded-full flex-shrink-0" />
+                                                <div className="w-full relative">
+                                                    <textarea value={newComment} onChange={e => setNewComment(e.target.value)} placeholder="Write a comment..." rows={1} className="w-full bg-gray-700 rounded-full py-2 pl-4 pr-10 resize-none text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"></textarea>
+                                                    <button onClick={() => handlePostComment(post.id)} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-cyan-600 rounded-full disabled:bg-gray-500" disabled={!newComment.trim()}>&rarr;</button>
+                                                </div>
+                                            </div>
                                             {comments[post.id]?.map(comment => (
-                                                <div key={comment.id} className="flex items-start gap-2">
-                                                    <UserAvatar name={comment.authorName} avatarUrl={comment.authorAvatar} className="w-8 h-8 rounded-full flex-shrink-0" />
-                                                    <div className="bg-gray-700 p-2 rounded-lg">
+                                                <div key={comment.id} className="flex items-start gap-2 pl-4">
+                                                     <UserAvatar name={comment.authorName} avatarUrl={comment.authorAvatar} className="w-8 h-8 rounded-full flex-shrink-0" />
+                                                    <div className="bg-gray-700 px-3 py-2 rounded-2xl">
                                                         <p className="font-bold text-sm text-white">{comment.authorName}</p>
                                                         <p className="text-sm text-gray-300">{comment.content}</p>
                                                     </div>
                                                 </div>
                                             ))}
-                                            <div className="flex items-center gap-2">
-                                                <UserAvatar name={currentUser!.name} avatarUrl={currentUser!.avatarUrl} className="w-8 h-8 rounded-full flex-shrink-0" />
-                                                <input
-                                                    value={newComment}
-                                                    onChange={e => setNewComment(e.target.value)}
-                                                    onKeyPress={e => e.key === 'Enter' && handlePostComment(post.id)}
-                                                    placeholder="Write a comment..."
-                                                    className="w-full px-3 py-2 bg-gray-700 rounded-full text-sm"
-                                                />
-                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -1832,129 +1804,64 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                 );
         }
     };
-
-    if (!currentUser) {
-        return <div className="text-center p-8">Error: Could not load user data.</div>;
-    }
+    
+    if (!currentUser) return <div>Loading user...</div>;
 
     return (
-        <div className="h-full w-full bg-gray-900 text-white flex font-sans">
-            {postToDelete && (
-                <ConfirmationModal
-                    isOpen={true}
-                    title="Delete Post"
-                    message={<p>Are you sure you want to permanently delete this post? This action cannot be undone.</p>}
-                    onConfirm={confirmDelete}
-                    onCancel={() => setPostToDelete(null)}
-                    confirmText="Delete"
-                    confirmButtonVariant="danger"
-                />
-            )}
+        <div className="flex flex-col h-full bg-gray-900 text-white font-sans">
+             {profileModalUser && <UserProfileModal userToShow={profileModalUser} currentUser={currentUser} onClose={() => setProfileModalUser(null)} onStartMessage={handleStartMiniChat} />}
+             {chatTarget && <MiniChatWindow currentUser={user as User} targetUser={chatTarget} onClose={() => setChatTarget(null)} />}
+             {mapPreviewUrl && <MapPreviewModal url={mapPreviewUrl} onClose={() => setMapPreviewUrl(null)} />}
+             {isAddStoryModalOpen && <AddStoryModal user={currentUser} onClose={() => setIsAddStoryModalOpen(false)} onStoryPosted={refreshStories} />}
+             {viewingStoriesOfUser && <StoryViewer onClose={() => setViewingStoriesOfUser(null)} />}
+             {postToDelete && <ConfirmationModal isOpen={true} title="Delete Post" message="Are you sure you want to permanently delete this post?" onConfirm={confirmDelete} onCancel={() => setPostToDelete(null)} confirmButtonVariant="danger" />}
+            {viewingListing && <ListingDetailModal listing={viewingListing} onClose={() => setViewingListing(null)} onStartMessage={handleStartMiniChat} currentUserId={currentUserId} />}
             
-            <button
-                onClick={() => setIsMobileMenuOpen(prev => !prev)}
-                className="lg:hidden fixed top-4 right-4 z-50 p-2 bg-gray-700 rounded-full text-white shadow-lg"
-                aria-label="Toggle Menu"
-            >
-                 <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-            </button>
-            
-            <aside className={`bg-gray-800 text-white flex-shrink-0 flex flex-col p-4 transition-all duration-300 lg:flex lg:w-64 ${isMobileMenuOpen ? 'w-1/3 flex' : 'hidden'}`}>
-                <div className="flex items-center justify-start mb-8 h-10">
-                    <div className="flex items-center space-x-3 overflow-hidden">
+            <header className="bg-gray-800 p-2 flex items-center justify-between gap-2 border-b border-gray-700 sticky top-0 z-[100]">
+                <div className="flex items-center gap-2">
+                    {onBackToDashboard && <button onClick={onBackToDashboard} className="p-2 rounded-full hover:bg-gray-700">&larr;</button>}
+                    <div className="flex items-center gap-2">
                         <IconOnline />
-                        <h1 className="font-bold text-xl text-cyan-400 truncate">Online</h1>
+                        <h2 className="text-xl font-bold">Online</h2>
                     </div>
                 </div>
-                <nav className="space-y-2">
-                    {(['feed', 'chat', 'groups', 'events', 'marketplace'] as const).map(v => {
-                        const icons = { feed: <IconNavFeed />, chat: <IconNavChat />, groups: <IconNavGroups />, events: <IconNavEvents />, marketplace: <IconNavMarketplace />};
-                        let label = v.charAt(0).toUpperCase() + v.slice(1);
-                        if (v === 'marketplace') {
-                            label = 'Shop';
-                        }
-                        return (
-                            <button 
-                                key={v} 
-                                onClick={() => { setView(v); setIsMobileMenuOpen(false); }} 
-                                className={`w-full flex items-center gap-3 p-3 rounded-lg text-left group ${view === v ? 'bg-cyan-600' : 'hover:bg-gray-700'} justify-start`}
-                            >
-                                {icons[v]} 
-                                <span>{label}</span>
-                            </button>
-                        )
-                    })}
-                </nav>
-            </aside>
+                
+                <div className="hidden lg:flex items-center gap-1 bg-gray-900 p-1 rounded-lg">
+                    <button onClick={() => setView('feed')} className={`px-4 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 ${view === 'feed' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavFeed /> Feed</button>
+                    <button onClick={() => setView('groups')} className={`px-4 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 ${view === 'groups' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavGroups /> Groups</button>
+                    <button onClick={() => setView('events')} className={`px-4 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 ${view === 'events' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavEvents /> Events</button>
+                    <button onClick={() => setView('marketplace')} className={`px-4 py-1.5 text-sm font-semibold rounded-md flex items-center gap-2 ${view === 'marketplace' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavMarketplace /> Shop</button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setView('chat')} className="p-2 rounded-full bg-gray-700 hover:bg-gray-600"><IconNavChat/></button>
+                    <button className="p-2 rounded-full bg-gray-700 hover:bg-gray-600"><IconBell /></button>
+                    <button className="lg:hidden p-2 rounded-full bg-gray-700 hover:bg-gray-600" onClick={() => setIsMobileMenuOpen(true)}><IconHamburger /></button>
+                </div>
+            </header>
+
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 bg-black/70 z-[110]" onClick={() => setIsMobileMenuOpen(false)}>
+                    <div className="fixed top-0 right-0 h-full w-64 bg-gray-800 p-4 animate-slide-in-right" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold">Menu</h3>
+                            <button onClick={() => setIsMobileMenuOpen(false)}><IconClose/></button>
+                        </div>
+                         <nav className="flex flex-col gap-2">
+                            <button onClick={() => { setView('feed'); setIsMobileMenuOpen(false); }} className={`px-4 py-3 text-left font-semibold rounded-md flex items-center gap-3 ${view === 'feed' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavFeed /> Feed</button>
+                            <button onClick={() => { setView('groups'); setIsMobileMenuOpen(false); }} className={`px-4 py-3 text-left font-semibold rounded-md flex items-center gap-3 ${view === 'groups' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavGroups /> Groups</button>
+                            <button onClick={() => { setView('events'); setIsMobileMenuOpen(false); }} className={`px-4 py-3 text-left font-semibold rounded-md flex items-center gap-3 ${view === 'events' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavEvents /> Events</button>
+                            <button onClick={() => { setView('marketplace'); setIsMobileMenuOpen(false); }} className={`px-4 py-3 text-left font-semibold rounded-md flex items-center gap-3 ${view === 'marketplace' ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}><IconNavMarketplace /> Shop</button>
+                        </nav>
+                    </div>
+                </div>
+            )}
             
-            <main className={`overflow-y-auto lg:flex-1 ${isMobileMenuOpen ? 'w-2/3' : 'w-full'}`}>
-                <div className="max-w-3xl mx-auto p-4 md:p-6">
+            <main className="flex-1 p-2 sm:p-4 lg:p-6 overflow-y-auto">
+                <div className="max-w-3xl mx-auto">
                     {renderContent()}
                 </div>
             </main>
-            
-            <aside className="hidden xl:block w-72 bg-gray-800 p-4 border-l border-gray-700">
-                <h3 className="font-bold mb-4">Announcements</h3>
-            </aside>
-            
-            {isProfileOpen && (
-                <ProfilePage
-                    user={currentUser}
-                    onClose={() => setIsProfileOpen(false)}
-                    onProfileUpdate={(updatedUser) => {
-                    }}
-                />
-            )}
-            
-            {chatTarget && currentUser && (
-                <MiniChatWindow
-                    currentUser={currentUser as User}
-                    targetUser={chatTarget}
-                    onClose={() => setChatTarget(null)}
-                />
-            )}
-            {viewingListing && currentUser && (
-                <ListingDetailModal
-                    listing={viewingListing}
-                    onClose={() => setViewingListing(null)}
-                    onStartMessage={handleStartMiniChat}
-                    currentUserId={currentUserId}
-                />
-            )}
-
-            {mapPreviewUrl && (
-                <MapPreviewModal url={mapPreviewUrl} onClose={() => setMapPreviewUrl(null)} />
-            )}
-            {isAddStoryModalOpen && currentUser && (
-                <AddStoryModal 
-                    user={currentUser} 
-                    onClose={() => setIsAddStoryModalOpen(false)} 
-                    onStoryPosted={() => {
-                        setIsAddStoryModalOpen(false);
-                        refreshStories();
-                    }}
-                />
-            )}
-            {viewingStoriesOfUser && (
-                <StoryViewer
-                    initialUser={viewingStoriesOfUser}
-                    allUsersWithStories={allUsersWithStories}
-                    storiesByUser={storiesByUser}
-                    onClose={() => setViewingStoriesOfUser(null)}
-                    currentUserId={currentUserId}
-                    onStoryUpdate={refreshStories}
-                />
-            )}
-            {profileModalUser && currentUser && (
-                <UserProfileModal
-                    userToShow={profileModalUser}
-                    currentUser={currentUser}
-                    onClose={() => setProfileModalUser(null)}
-                    onStartMessage={handleStartMiniChat}
-                />
-            )}
         </div>
     );
 };
