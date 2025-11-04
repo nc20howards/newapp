@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, AdminUser, PostComment, ChatConversation, ChatMessage, ChatAttachment, Event, Place, MarketplaceListing, MarketplaceMedia, Story, GroupPost, School } from '../types';
 import ProfilePage from './ProfilePage';
@@ -79,7 +78,7 @@ const IconSchedule = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-
 const IconLike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.085a2 2 0 00-1.736.93L5.5 8m7 2v5m0 0v5m0-5h5" /></svg>;
 const IconDislike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.085a2 2 0 001.736-.93l2.5-4m-7 2v-5m0 0V5m0 5h5" /></svg>;
 const IconComment = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>;
-const IconShare = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.368a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" /></svg>;
+const IconCopyLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
 const IconEye = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
 const IconLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>;
 
@@ -670,6 +669,7 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; setViewingListing: (li
     const [confirmModal, setConfirmModal] = useState<{ message: React.ReactNode; onConfirm: () => void; } | null>(null);
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [expandedListings, setExpandedListings] = useState(new Set<string>());
+    const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
     const currentUserId = 'studentId' in user ? user.studentId : user.id;
 
@@ -693,14 +693,28 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; setViewingListing: (li
         refreshListings();
     }, [refreshListings]);
 
-    const handleShare = (listing: MarketplaceListing) => {
+    const handleShare = async (listing: MarketplaceListing) => {
         const url = `${window.location.origin}${window.location.pathname}#/marketplace/view/listing/${listing.id}`;
-        navigator.clipboard.writeText(url).then(() => {
-            alert('Product link copied to clipboard!');
-        }, (err) => {
-            console.error('Could not copy text: ', err);
-            alert('Failed to copy link.');
-        });
+        try {
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = url;
+                textArea.style.position = 'fixed';
+                textArea.style.top = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            setCopiedLink(listing.id);
+            setTimeout(() => setCopiedLink(null), 2500);
+        } catch (err) {
+            console.error('Could not copy link: ', err);
+            prompt('Failed to copy. Please copy this link manually:', url);
+        }
     };
 
     const toggleExpand = (listingId: string) => {
@@ -892,8 +906,8 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; setViewingListing: (li
                                         <span>{listing.sellerName}</span>
                                     </div>
                                     <div className="flex items-center gap-1">
-                                         <button onClick={() => handleShare(listing)} className="p-2 hover:bg-gray-700 rounded-full" title="Share">
-                                            <IconShare />
+                                         <button onClick={() => handleShare(listing)} className="p-2 hover:bg-gray-700 rounded-full" title="Copy Link">
+                                            {copiedLink === listing.id ? <span className="text-xs text-cyan-400">Copied!</span> : <IconCopyLink />}
                                         </button>
                                         {listing.sellerId === currentUserId && (
                                             <>
@@ -1192,6 +1206,7 @@ const ListingDetailModal: React.FC<{
     currentUserId: string;
 }> = ({ listing, onClose, onStartMessage, currentUserId }) => {
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+    const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
     const nextMedia = () => setCurrentMediaIndex((prev) => (prev + 1) % listing.media.length);
     const prevMedia = () => setCurrentMediaIndex((prev) => (prev - 1 + listing.media.length) % listing.media.length);
@@ -1199,6 +1214,30 @@ const ListingDetailModal: React.FC<{
     const handleMessageSeller = () => {
         onStartMessage(listing.sellerId);
         onClose();
+    };
+    
+    const handleShare = async () => {
+        const url = `${window.location.origin}${window.location.pathname}#/marketplace/view/listing/${listing.id}`;
+        try {
+            if (navigator.clipboard) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = url;
+                textArea.style.position = 'fixed';
+                textArea.style.top = '-9999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            setCopiedLink(listing.id);
+            setTimeout(() => setCopiedLink(null), 2500);
+        } catch (err) {
+            console.error('Could not copy link: ', err);
+            prompt('Failed to copy automatically. Please copy this link manually:', url);
+        }
     };
 
     return (
@@ -1228,7 +1267,12 @@ const ListingDetailModal: React.FC<{
                 <div className="w-full md:w-2/5 flex flex-col p-6 overflow-y-auto">
                     <div className="flex justify-between items-start">
                         <span className="text-xs font-semibold px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded-full self-start mb-2">{listing.category}</span>
-                        <button onClick={onClose} className="text-2xl text-gray-400 hover:text-white">&times;</button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={handleShare} className="p-2 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" title="Copy Link">
+                                {copiedLink === listing.id ? <span className="text-xs text-cyan-400">Copied!</span> : <IconCopyLink />}
+                            </button>
+                            <button onClick={onClose} className="text-2xl text-gray-400 hover:text-white">&times;</button>
+                        </div>
                     </div>
                     <h2 className="text-2xl font-bold text-white mt-2">{listing.title}</h2>
                     <p className="font-bold text-3xl text-cyan-400 my-4">UGX {listing.price.toLocaleString()}</p>
@@ -1338,7 +1382,7 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                     if (listing) {
                         setView('marketplace');
                         setViewingListing(listing);
-                        window.history.pushState("", document.title, window.location.pathname + window.location.search);
+                        window.history.replaceState("", document.title, window.location.pathname + window.location.search);
                     }
                 }
             }
@@ -1668,7 +1712,7 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                                             <IconComment /> <span className="hidden sm:inline ml-1.5">Comment</span>
                                         </button>
                                         <button onClick={() => alert('Share functionality is coming soon!')} className="flex items-center justify-center w-full py-2 rounded-md text-gray-400 hover:bg-gray-700">
-                                            <IconShare /> <span className="hidden sm:inline ml-1.5">Share</span>
+                                            <IconCopyLink /> <span className="hidden sm:inline ml-1.5">Share</span>
                                         </button>
                                     </div>
 
