@@ -13,6 +13,11 @@ const saveListings = (listings: MarketplaceListing[]) => {
     localStorage.setItem(LISTINGS_KEY, JSON.stringify(listings));
 };
 
+export const getListingById = (listingId: string): MarketplaceListing | null => {
+    const listings = getListings();
+    return listings.find(l => l.id === listingId) || null;
+};
+
 export const createListing = (data: Omit<MarketplaceListing, 'id' | 'createdAt'>): MarketplaceListing => {
     const listings = getListings();
     const newListing: MarketplaceListing = {

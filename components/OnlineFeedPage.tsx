@@ -81,6 +81,8 @@ const IconDislike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5
 const IconComment = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>;
 const IconShare = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.368a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" /></svg>;
 const IconEye = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
+const IconLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>;
+
 
 const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: string) => void }> = ({ user, onPost }) => {
     const [title, setTitle] = useState('');
@@ -88,6 +90,21 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isDragOver, setIsDragOver] = useState(false);
     const savedSelectionRef = useRef<Range | null>(null);
+
+    const saveSelection = () => {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
+            savedSelectionRef.current = selection.getRangeAt(0).cloneRange();
+        }
+    };
+
+    const restoreSelection = () => {
+        const selection = window.getSelection();
+        if (selection && savedSelectionRef.current) {
+            selection.removeAllRanges();
+            selection.addRange(savedSelectionRef.current);
+        }
+    };
 
     const insertHtmlAtCursor = (html: string) => {
         if (!editorRef.current) return;
@@ -114,6 +131,26 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
             newRange.collapse(true);
             sel.removeAllRanges();
             sel.addRange(newRange);
+        }
+    };
+
+    const handleLink = () => {
+        if (!editorRef.current) return;
+        editorRef.current.focus();
+        saveSelection();
+
+        const url = prompt("Enter the URL:", "https://");
+        restoreSelection();
+
+        if (url) {
+            const selection = window.getSelection();
+            document.execCommand('createLink', false, url);
+            const parentElement = selection?.focusNode?.parentElement;
+            if (parentElement && parentElement.tagName === 'A') {
+                parentElement.style.color = '#22d3ee'; // tailwind cyan-400
+                parentElement.setAttribute('target', '_blank');
+                parentElement.setAttribute('rel', 'noopener noreferrer');
+            }
         }
     };
 
@@ -149,17 +186,7 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     };
 
     const handleAttachmentClick = (acceptType: string) => {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
-            savedSelectionRef.current = selection.getRangeAt(0).cloneRange();
-        } else {
-            editorRef.current?.focus();
-            const newRange = document.createRange();
-            newRange.selectNodeContents(editorRef.current!);
-            newRange.collapse(false); // Go to the end
-            savedSelectionRef.current = newRange;
-        }
-
+        saveSelection();
         if (fileInputRef.current) {
             fileInputRef.current.accept = acceptType;
             fileInputRef.current.click();
@@ -167,6 +194,7 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     };
     
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        restoreSelection();
         if (e.target.files) {
             await processFiles(e.target.files);
         }
@@ -184,20 +212,14 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
         }
     };
     
-    const handlePaste = async (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-            savedSelectionRef.current = selection.getRangeAt(0);
-        }
+        const text = e.clipboardData.getData('text/plain');
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
 
-        if (e.clipboardData.files.length > 0) {
-            await processFiles(e.clipboardData.files);
-        } else {
-            const text = e.clipboardData.getData('text/plain');
-            const sanitizedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-            document.execCommand('insertText', false, sanitizedText);
-        }
+        const sanitizedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const linkedText = sanitizedText.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #22d3ee;">${url}</a>`);
+        document.execCommand('insertHTML', false, linkedText);
     };
 
     const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -235,9 +257,7 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
             }
         }
         
-        if (sel && sel.rangeCount > 0) {
-            savedSelectionRef.current = sel.getRangeAt(0);
-        }
+        saveSelection();
 
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             await processFiles(e.dataTransfer.files);
@@ -284,6 +304,9 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
                     </button>
                     <button type="button" onClick={() => handleAttachmentClick('.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt')} title="Attach File" className="p-2 text-gray-400 hover:text-blue-500 hover:bg-gray-700 rounded-full transition-colors">
                         <IconComposerFile />
+                    </button>
+                    <button type="button" onClick={handleLink} title="Add Link" className="p-2 text-gray-400 hover:text-cyan-500 hover:bg-gray-700 rounded-full transition-colors">
+                        <IconLink />
                     </button>
                 </div>
                 <button onClick={handlePost} className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold disabled:opacity-50" disabled={!title.trim() || editorIsEmpty}>Post</button>
@@ -639,7 +662,7 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
     );
 };
 
-const MarketplaceView: React.FC<{ user: User | AdminUser; }> = ({ user }) => {
+const MarketplaceView: React.FC<{ user: User | AdminUser; setViewingListing: (listing: MarketplaceListing) => void; }> = ({ user, setViewingListing }) => {
     const [listings, setListings] = useState<MarketplaceListing[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingListing, setEditingListing] = useState<MarketplaceListing | null>(null);
@@ -669,6 +692,16 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; }> = ({ user }) => {
     useEffect(() => {
         refreshListings();
     }, [refreshListings]);
+
+    const handleShare = (listing: MarketplaceListing) => {
+        const url = `${window.location.origin}${window.location.pathname}#/marketplace/view/listing/${listing.id}`;
+        navigator.clipboard.writeText(url).then(() => {
+            alert('Product link copied to clipboard!');
+        }, (err) => {
+            console.error('Could not copy text: ', err);
+            alert('Failed to copy link.');
+        });
+    };
 
     const toggleExpand = (listingId: string) => {
         setExpandedListings(prev => {
@@ -835,13 +868,13 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; }> = ({ user }) => {
                     const isExpanded = expandedListings.has(listing.id);
                     return (
                         <div key={listing.id} className="bg-gray-800 rounded-lg shadow-xl flex flex-col">
-                            <div className="w-full h-48 bg-gray-700 rounded-t-lg overflow-hidden">
+                            <div className="w-full h-48 bg-gray-700 rounded-t-lg overflow-hidden cursor-pointer" onClick={() => setViewingListing(listing)}>
                                 {listing.media[0]?.type === 'image' && <img src={listing.media[0].url} alt={listing.title} className="w-full h-full object-cover"/>}
                                 {listing.media[0]?.type === 'video' && <video src={listing.media[0].url} className="w-full h-full object-cover" controls />}
                             </div>
                             <div className="p-4 flex-grow flex flex-col">
                                 <span className="text-xs font-semibold px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded-full self-start mb-2">{listing.category}</span>
-                                <h4 className="font-bold text-lg text-white">{listing.title}</h4>
+                                <h4 onClick={() => setViewingListing(listing)} className="font-bold text-lg text-white cursor-pointer hover:text-cyan-300">{listing.title}</h4>
                                 <div className="text-sm text-gray-300 my-2 flex-grow">
                                     <p className={`${isLong && !isExpanded ? 'line-clamp-2' : ''}`}>
                                         {listing.description}
@@ -858,12 +891,17 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; }> = ({ user }) => {
                                         <UserAvatar name={listing.sellerName} avatarUrl={listing.sellerAvatar} className="w-8 h-8 rounded-full" />
                                         <span>{listing.sellerName}</span>
                                     </div>
-                                    {listing.sellerId === currentUserId && (
-                                        <div className="space-x-2">
-                                            <button onClick={() => openModal(listing)} className="text-xs">Edit</button>
-                                            <button onClick={() => handleDelete(listing)} className="text-xs text-red-400">Delete</button>
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                         <button onClick={() => handleShare(listing)} className="p-2 hover:bg-gray-700 rounded-full" title="Share">
+                                            <IconShare />
+                                        </button>
+                                        {listing.sellerId === currentUserId && (
+                                            <>
+                                                <button onClick={() => openModal(listing)} className="p-2 hover:bg-gray-700 rounded-full text-xs" title="Edit">Edit</button>
+                                                <button onClick={() => handleDelete(listing)} className="p-2 hover:bg-gray-700 rounded-full text-xs text-red-400" title="Delete">Delete</button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -873,7 +911,6 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; }> = ({ user }) => {
         </div>
     );
 };
-
 
 const MapPreviewModal: React.FC<{ url: string; onClose: () => void; }> = ({ url, onClose }) => {
     return (
@@ -1147,6 +1184,87 @@ const UserProfileModal: React.FC<{
     );
 };
 
+// --- NEW: LISTING DETAIL MODAL ---
+const ListingDetailModal: React.FC<{
+    listing: MarketplaceListing;
+    onClose: () => void;
+    onStartMessage: (userId: string) => void;
+    currentUserId: string;
+}> = ({ listing, onClose, onStartMessage, currentUserId }) => {
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+
+    const nextMedia = () => setCurrentMediaIndex((prev) => (prev + 1) % listing.media.length);
+    const prevMedia = () => setCurrentMediaIndex((prev) => (prev - 1 + listing.media.length) % listing.media.length);
+
+    const handleMessageSeller = () => {
+        onStartMessage(listing.sellerId);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[110] p-4 animate-fade-in-up" onClick={onClose}>
+            <div className="bg-gray-800 rounded-lg w-full max-w-4xl h-[90vh] flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="w-full md:w-3/5 h-64 md:h-full bg-gray-900 relative flex items-center justify-center">
+                    {listing.media.length > 0 ? (
+                        <>
+                            {listing.media[currentMediaIndex].type === 'image' ? (
+                                <img src={listing.media[currentMediaIndex].url} alt={listing.title} className="max-w-full max-h-full object-contain" />
+                            ) : (
+                                <video src={listing.media[currentMediaIndex].url} className="max-w-full max-h-full" controls autoPlay loop />
+                            )}
+
+                            {listing.media.length > 1 && (
+                                <>
+                                    <button onClick={prevMedia} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/80">&lt;</button>
+                                    <button onClick={nextMedia} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/80">&gt;</button>
+                                </>
+                            )}
+                        </>
+                    ) : (
+                        <div className="text-gray-500">No media available</div>
+                    )}
+                </div>
+
+                <div className="w-full md:w-2/5 flex flex-col p-6 overflow-y-auto">
+                    <div className="flex justify-between items-start">
+                        <span className="text-xs font-semibold px-2 py-1 bg-cyan-500/20 text-cyan-300 rounded-full self-start mb-2">{listing.category}</span>
+                        <button onClick={onClose} className="text-2xl text-gray-400 hover:text-white">&times;</button>
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mt-2">{listing.title}</h2>
+                    <p className="font-bold text-3xl text-cyan-400 my-4">UGX {listing.price.toLocaleString()}</p>
+                    
+                    <div className="text-sm space-y-2 mb-4">
+                        <p><strong className="text-gray-400">Condition:</strong> <span className="capitalize">{listing.condition}</span></p>
+                        <p><strong className="text-gray-400">Location:</strong> {listing.location}</p>
+                    </div>
+
+                    <div className="prose prose-sm prose-invert max-w-none text-gray-300 flex-grow">
+                        <p>{listing.description}</p>
+                    </div>
+
+                    <div className="mt-6 pt-4 border-t border-gray-700">
+                        <p className="text-sm text-gray-400 mb-2">Seller Information</p>
+                        <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <UserAvatar name={listing.sellerName} avatarUrl={listing.sellerAvatar} className="w-12 h-12 rounded-full" />
+                                <div>
+                                    <p className="font-semibold">{listing.sellerName}</p>
+                                    <p className="text-xs text-gray-400">Posted {timeSince(listing.createdAt)}</p>
+                                </div>
+                            </div>
+                            {listing.sellerId !== currentUserId && (
+                                <button onClick={handleMessageSeller} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-sm font-semibold rounded-md">
+                                    Message Seller
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 interface OnlineFeedPageProps {
     user: User | AdminUser;
@@ -1189,6 +1307,7 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
     const [profileModalUser, setProfileModalUser] = useState<User | AdminUser | null>(null);
     
     const [chatTarget, setChatTarget] = useState<User | AdminUser | null>(null);
+    const [viewingListing, setViewingListing] = useState<MarketplaceListing | null>(null);
     
     const currentUser = findFullUserById('studentId' in user ? user.studentId : user.id);
     const currentUserId = 'studentId' in user ? user.studentId : user.id;
@@ -1208,6 +1327,27 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
 
     const observer = useRef<IntersectionObserver | null>(null);
     const viewedPostsRef = useRef(new Set<string>());
+
+    useEffect(() => {
+        const handleHashChange = () => {
+            const hash = window.location.hash;
+            if (hash.startsWith('#/marketplace/view/listing/')) {
+                const listingId = hash.split('/').pop();
+                if (listingId) {
+                    const listing = marketplaceService.getListingById(listingId);
+                    if (listing) {
+                        setView('marketplace');
+                        setViewingListing(listing);
+                        window.history.pushState("", document.title, window.location.pathname + window.location.search);
+                    }
+                }
+            }
+        };
+
+        handleHashChange();
+        window.addEventListener('hashchange', handleHashChange);
+        return () => window.removeEventListener('hashchange', handleHashChange);
+    }, []);
 
     useEffect(() => {
         const intersectionCallback = (entries: IntersectionObserverEntry[]) => {
@@ -1392,7 +1532,7 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
             case 'events':
                 return <EventsView user={currentUser!} school={school} onMapClick={handleMapClick} />;
             case 'marketplace':
-                return <MarketplaceView user={currentUser!} />;
+                return <MarketplaceView user={currentUser!} setViewingListing={setViewingListing} />;
             case 'feed':
             default:
                 return (
@@ -1646,6 +1786,14 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                     currentUser={currentUser as User}
                     targetUser={chatTarget}
                     onClose={() => setChatTarget(null)}
+                />
+            )}
+            {viewingListing && currentUser && (
+                <ListingDetailModal
+                    listing={viewingListing}
+                    onClose={() => setViewingListing(null)}
+                    onStartMessage={handleStartMiniChat}
+                    currentUserId={currentUserId}
                 />
             )}
 
