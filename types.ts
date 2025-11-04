@@ -425,6 +425,7 @@ export interface CanteenTable {
 export interface CanteenSeatSettings {
   totalStudents: number;
   breakfastMinutes: number;
+  breakfastStartTime: string; // e.g., "07:00"
   tables: CanteenTable[];
 }
 
@@ -472,7 +473,9 @@ export interface CanteenOrder {
   timestamp: number;
   transactionId?: string;
   deliveryMethod: 'pickup' | 'delivery';
-  deliveryDetails?: string;
+  assignedTable: string | null;
+  assignedSlotStart: number | null;
+  assignedSlotEnd: number | null;
 }
 
 export interface DecodedQrOrder {

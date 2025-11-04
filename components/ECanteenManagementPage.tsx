@@ -250,12 +250,16 @@ const ECanteenManagementPage = ({ school, user }: ECanteenManagementPageProps) =
                     {/* Settings Form */}
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">Total Students</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">Total Students for Breakfast</label>
                             <input type="number" value={settings.seatSettings.totalStudents} onChange={e => handleSeatSettingsChange('totalStudents', parseInt(e.target.value, 10) || 0)} className="w-full p-2 bg-gray-700 rounded-md" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Breakfast Period (Minutes)</label>
                             <input type="number" value={settings.seatSettings.breakfastMinutes} onChange={e => handleSeatSettingsChange('breakfastMinutes', parseInt(e.target.value, 10) || 0)} className="w-full p-2 bg-gray-700 rounded-md" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">Breakfast Start Time</label>
+                            <input type="time" value={settings.seatSettings.breakfastStartTime} onChange={e => handleSeatSettingsChange('breakfastStartTime', e.target.value)} className="w-full p-2 bg-gray-700 rounded-md" />
                         </div>
                         <div className="border-t border-gray-700 pt-4">
                             <h4 className="font-bold mb-2">Calculated Timeframe</h4>

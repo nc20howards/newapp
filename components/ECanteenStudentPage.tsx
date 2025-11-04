@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { School, User, CanteenShop, CanteenCategory, CanteenMenuItem, CanteenOrder, CanteenSettings, DecodedQrOrder } from '../types';
 import * as canteenService from '../services/canteenService';
 import PinStrengthIndicator from './PinStrengthIndicator';
-import * as eWalletService from '../services/eWalletService';
+import * as eWalletService from './eWalletService';
 import { findUserById } from '../services/groupService';
 import * as studentService from '../services/studentService';
 
@@ -94,7 +94,9 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
     
     // State for Attendance tab
     const [attendanceSearchTerm, setAttendanceSearchTerm] = useState('');
-    const [expandedAttendanceOrderId, setExpandedAttendanceOrderId] = useState<string | null>(null);
+    const [attendanceFeedback, setAttendanceFeedback] = useState({ message: '', type: '' });
+    const [attendanceOrder, setAttendanceOrder] = useState<CanteenOrder | null>(null);
+    const attendanceInputRef = useRef<HTMLInputElement>(null);
 
     const refreshSellerData = useCallback(() => {
         if (shop) {
@@ -120,10 +122,13 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
         }
     }, [shop, refreshSellerData]);
     
-    // Auto-focus input when POS tab is active
+    // Auto-focus input when POS/Attendance tab is active
     useEffect(() => {
         if (activeTab === 'pos' && posInputRef.current) {
             posInputRef.current.focus();
+        }
+        if (activeTab === 'attendance' && attendanceInputRef.current) {
+            attendanceInputRef.current.focus();
         }
     }, [activeTab]);
 
@@ -188,20 +193,6 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
     useEffect(() => {
         setSelectedOrderIds([]);
     }, [orderStatusTab]);
-    
-    const completedOrders = useMemo(() => {
-        return orders.filter(o => o.status === 'completed');
-    }, [orders]);
-
-    const filteredAttendanceOrders = useMemo(() => {
-        if (!attendanceSearchTerm) return completedOrders;
-        const lowercasedFilter = attendanceSearchTerm.toLowerCase();
-        return completedOrders.filter(order =>
-            order.studentName.toLowerCase().includes(lowercasedFilter) ||
-            order.studentId.toLowerCase().includes(lowercasedFilter) ||
-            order.id.toLowerCase().includes(lowercasedFilter)
-        );
-    }, [completedOrders, attendanceSearchTerm]);
 
     const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.checked) {
@@ -279,11 +270,14 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
         const codeReader = new ZXingBrowser.BrowserMultiFormatReader();
         codeReader.decodeFromImageUrl(dataUrl)
             .then((result: any) => {
-                setScannedStudentId(result.getText());
+                if(activeTab === 'pos') setScannedStudentId(result.getText());
+                if(activeTab === 'attendance') setAttendanceSearchTerm(result.getText());
             })
             .catch((err: any) => {
                 console.error(err);
-                setPosError("No barcode could be read from the image. Please try again with a clearer picture.");
+                const errorMsg = "No barcode could be read from the image. Please try again with a clearer picture.";
+                if(activeTab === 'pos') setPosError(errorMsg);
+                if(activeTab === 'attendance') setAttendanceFeedback({ message: errorMsg, type: 'error' });
             })
             .finally(() => {
                 setIsProcessingImage(false);
@@ -293,7 +287,8 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
     const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            resetPos();
+            if(activeTab === 'pos') resetPos();
+            if(activeTab === 'attendance') setAttendanceFeedback({ message: '', type: '' });
             setIsProcessingImage(true);
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -307,7 +302,8 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
 
     const handleSnapDesktopPhoto = () => {
         if (desktopVideoRef.current) {
-            resetPos();
+            if(activeTab === 'pos') resetPos();
+            if(activeTab === 'attendance') setAttendanceFeedback({ message: '', type: '' });
             setIsProcessingImage(true);
             const canvas = document.createElement('canvas');
             canvas.width = desktopVideoRef.current.videoWidth;
@@ -324,7 +320,8 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
     
     const handleScanButtonClick = () => {
         const isMobile = /Mobi/i.test(navigator.userAgent);
-        resetPos();
+        if(activeTab === 'pos') resetPos();
+        if(activeTab === 'attendance') setAttendanceFeedback({ message: '', type: '' });
         if (isMobile) {
             mobileFileInputRef.current?.click();
         } else {
@@ -429,72 +426,76 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
         setExpandedOrderId(prevId => prevId === orderId ? null : orderId);
     };
     
-    // Effect to process the order ID once it's set from scanning or manual input
     useEffect(() => {
-        if (scannedStudentId) {
+        if (scannedStudentId && activeTab === 'pos') {
             handleFindOrder();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [scannedStudentId]);
+    }, [scannedStudentId, activeTab]);
+    
+    const handleAttendanceCheck = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setAttendanceFeedback({ message: '', type: '' });
+        setAttendanceOrder(null);
+        if (!shop) return;
+    
+        const studentId = extractStudentIdFromBarcode(attendanceSearchTerm, school.id);
+        if (!studentId) {
+            setAttendanceFeedback({ message: `No student found for ID: ${attendanceSearchTerm}`, type: 'error' });
+            return;
+        }
+    
+        const order = canteenService.getOrderForAttendanceCheck(studentId, school.id);
+        if (order) {
+            setAttendanceOrder(order);
+        } else {
+            const student = findUserById(studentId);
+            setAttendanceFeedback({ message: `No pending delivery order found for ${student?.name || studentId} at their assigned time.`, type: 'error' });
+        }
+    };
+
+    const handleSignIn = () => {
+        if (!attendanceOrder) return;
+        try {
+            canteenService.signInForCanteenAttendance(attendanceOrder.id);
+            setAttendanceFeedback({ message: `${attendanceOrder.studentName} has been signed in. The carrier has been notified.`, type: 'success' });
+            setAttendanceOrder(null);
+            setAttendanceSearchTerm('');
+        } catch (e) {
+            setAttendanceFeedback({ message: (e as Error).message, type: 'error' });
+        }
+    };
+
+    useEffect(() => {
+        if (attendanceSearchTerm && activeTab === 'attendance') {
+            handleAttendanceCheck();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attendanceSearchTerm, activeTab]);
 
     const renderAttendanceTab = () => {
         return (
-            <div className="space-y-4">
-                <input
-                    type="text"
-                    value={attendanceSearchTerm}
-                    onChange={e => setAttendanceSearchTerm(e.target.value)}
-                    placeholder="Search by Student Name, ID, or Order ID..."
-                    className="w-full p-2 bg-gray-800 rounded-md"
-                />
-                <div className="overflow-x-auto bg-gray-800 rounded-lg">
-                    <table className="min-w-full">
-                        <thead className="bg-gray-700/50">
-                            <tr>
-                                <th className="p-3 text-left text-xs font-medium text-white uppercase tracking-wider">Order / Student</th>
-                                <th className="p-3 text-left text-xs font-medium text-white uppercase tracking-wider">Completed At</th>
-                                <th className="p-3 text-left text-xs font-medium text-white uppercase tracking-wider">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-700">
-                            {filteredAttendanceOrders.length > 0 ? filteredAttendanceOrders.map(order => (
-                                <React.Fragment key={order.id}>
-                                    <tr className="hover:bg-gray-900/50">
-                                        <td className="p-3">
-                                            <p className="font-bold text-white">#{order.id.slice(-6)} - {order.studentName}</p>
-                                            <p className="text-sm text-gray-400">{order.studentId}</p>
-                                            <button onClick={() => setExpandedAttendanceOrderId(prev => prev === order.id ? null : order.id)} className="text-xs text-cyan-400 hover:underline mt-1">
-                                                {expandedAttendanceOrderId === order.id ? 'Hide Items' : 'Show Items'}
-                                            </button>
-                                        </td>
-                                        <td className="p-3 text-sm text-gray-400">
-                                            {new Date(order.timestamp).toLocaleString()}
-                                        </td>
-                                        <td className="p-3 font-semibold text-white">
-                                            UGX {order.totalAmount.toLocaleString()}
-                                        </td>
-                                    </tr>
-                                    {expandedAttendanceOrderId === order.id && (
-                                        <tr className="bg-gray-700/50">
-                                            <td colSpan={3} className="p-4 border-t border-gray-700">
-                                                <h4 className="font-semibold text-sm mb-2 text-white">Order Items:</h4>
-                                                <ul className="space-y-1">
-                                                    {order.items.map(item => (
-                                                        <li key={item.itemId} className="text-sm flex justify-between text-white">
-                                                            <span>{item.quantity} x {item.name}</span>
-                                                            <span className="text-gray-300">UGX {(item.quantity * item.price).toLocaleString()}</span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </React.Fragment>
-                            )) : (
-                                <tr><td colSpan={3} className="text-center py-8 text-gray-400">No attendance records found.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+            <div className="bg-gray-800 p-6 rounded-lg max-w-2xl mx-auto space-y-4">
+                <h3 className="text-xl font-bold">Canteen Attendance Sign-In</h3>
+                <p className="text-sm text-gray-400">Enter or scan a student's ID to sign them in for their meal. This will notify the carrier of their table number.</p>
+                <form onSubmit={handleAttendanceCheck} className="flex items-center gap-2">
+                    <input ref={attendanceInputRef} type="text" value={attendanceSearchTerm} onChange={e => setAttendanceSearchTerm(e.target.value)} placeholder="Enter or Scan Student ID..." autoFocus className="w-full px-4 py-2 text-white bg-gray-700 rounded-md" />
+                    <button type="button" onClick={handleScanButtonClick} disabled={isProcessingImage} className="p-2.5 bg-gray-600 rounded-md" title="Scan with Camera">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM2 14a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2zM14 14a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /><path d="M8 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H10a2 2 0 01-2-2V6zM8 14a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H10a2 2 0 01-2-2v-2z" /></svg>
+                    </button>
+                    <button type="submit" className="px-4 py-2 bg-cyan-600 rounded-md">Check</button>
+                </form>
+                <div className="bg-gray-700 p-4 rounded-lg min-h-[150px]">
+                    <h4 className="font-bold mb-2">Verification</h4>
+                    {isProcessingImage && <p className="text-cyan-400">Processing image...</p>}
+                    {attendanceFeedback.message && <p className={`text-sm ${attendanceFeedback.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{attendanceFeedback.message}</p>}
+                    {attendanceOrder && (
+                        <div className="space-y-3">
+                            <div><p className="text-xs text-gray-400">Student</p><p className="font-semibold">{attendanceOrder.studentName} ({attendanceOrder.studentId})</p></div>
+                            <div><p className="text-xs text-gray-400">Assigned Table & Time</p><p className="font-semibold">Table {attendanceOrder.assignedTable} at {new Date(attendanceOrder.assignedSlotStart!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p></div>
+                            <button onClick={handleSignIn} className="w-full py-2 bg-green-600 hover:bg-green-700 rounded-md font-semibold">Sign In & Notify Carrier</button>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -737,7 +738,7 @@ export const CanteenSellerDashboard = ({ user, school }: { user: User; school: S
                                                     <div className="mt-3 pt-3 border-t border-gray-600">
                                                         <h4 className="font-semibold text-sm mb-1 text-white">Delivery Information:</h4>
                                                         {order.deliveryMethod === 'delivery' ? (
-                                                            <p className="text-sm text-gray-200">{order.deliveryDetails || 'No details provided.'}</p>
+                                                            <p className="text-sm text-gray-200">Table: {order.assignedTable || 'N/A'}</p>
                                                         ) : (
                                                             <p className="text-sm text-gray-300">Customer will pick up from the canteen.</p>
                                                         )}
@@ -819,8 +820,6 @@ const ECanteenStudentPage = ({ school, user }: ECanteenStudentPageProps) => {
     const [pinError, setPinError] = useState('');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery'>('pickup');
-    const [deliveryDetails, setDeliveryDetails] = useState('');
-
 
     // Cancel Order Modal State
     const [orderToCancel, setOrderToCancel] = useState<CanteenOrder | null>(null);
@@ -899,14 +898,10 @@ const ECanteenStudentPage = ({ school, user }: ECanteenStudentPageProps) => {
             setPinError("No shop selected.");
             return;
         }
-        if (deliveryMethod === 'delivery' && !deliveryDetails.trim()) {
-            setPinError("Please provide delivery details (e.g., your class name).");
-            return;
-        }
         try {
             const cartItems = Object.keys(cart).map(itemId => ({ itemId, quantity: cart[itemId] }));
             
-            canteenService.placeOrder(selectedShop.id, user.studentId, cartItems, pin, deliveryMethod, deliveryDetails);
+            canteenService.placeOrder(selectedShop.id, user.studentId, cartItems, pin, deliveryMethod);
             
             setPaymentSuccess(true);
             setTimeout(() => {
@@ -918,7 +913,6 @@ const ECanteenStudentPage = ({ school, user }: ECanteenStudentPageProps) => {
                 setView('orders');
                 refreshStudentOrders();
                 setDeliveryMethod('pickup');
-                setDeliveryDetails('');
             }, 2000);
             
         } catch (error) {
@@ -1045,16 +1039,8 @@ const ECanteenStudentPage = ({ school, user }: ECanteenStudentPageProps) => {
                                             <button onClick={() => setDeliveryMethod('pickup')} className={`w-full py-2 rounded-md text-sm ${deliveryMethod === 'pickup' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>Pickup</button>
                                             <button onClick={() => setDeliveryMethod('delivery')} className={`w-full py-2 rounded-md text-sm ${deliveryMethod === 'delivery' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>Local Delivery</button>
                                         </div>
+                                         {deliveryMethod === 'delivery' && <p className="text-xs text-gray-400 mt-2">A table and time slot will be automatically assigned to you upon payment.</p>}
                                     </div>
-                                    {deliveryMethod === 'delivery' && (
-                                        <textarea 
-                                            value={deliveryDetails} 
-                                            onChange={e => setDeliveryDetails(e.target.value)}
-                                            placeholder="e.g., Deliver to S.2 Block B"
-                                            rows={2}
-                                            className="w-full p-2 bg-gray-700 rounded-md text-sm"
-                                        />
-                                    )}
                                 </div>
 
                                 <div className="space-y-2">
@@ -1162,6 +1148,13 @@ const ECanteenStudentPage = ({ school, user }: ECanteenStudentPageProps) => {
                                     </li>
                                 ))}
                             </ul>
+                            {order.deliveryMethod === 'delivery' && (order.assignedTable || order.assignedSlotStart) && (
+                                <div className="mt-3 p-3 bg-indigo-500/10 rounded-lg text-left border-l-4 border-indigo-400">
+                                    <p className="font-semibold text-indigo-300">Your Schedule</p>
+                                    <p className="text-sm text-gray-300">Table: <strong className="text-white">{order.assignedTable || 'TBA'}</strong></p>
+                                    <p className="text-sm text-gray-300">Time: <strong className="text-white">{order.assignedSlotStart ? `${new Date(order.assignedSlotStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${new Date(order.assignedSlotEnd!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'TBA'}</strong></p>
+                                </div>
+                            )}
                             {order.status === 'ready' && canteenSettings?.activePaymentMethod === 'barcode' && (
                                 <div className="mt-3 p-3 bg-green-500/10 rounded-lg text-center">
                                     <p className="font-semibold text-green-300">Ready for Pickup!</p>

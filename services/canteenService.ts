@@ -40,6 +40,7 @@ export const getCanteenSettings = (schoolId: string): CanteenSettings => {
         seatSettings: {
             totalStudents: 0,
             breakfastMinutes: 30,
+            breakfastStartTime: "07:00",
             tables: [],
         },
     };
@@ -218,14 +219,12 @@ export const findReadyOrderForStudent = (studentId: string, shopId: string): Can
     return readyOrder || null;
 };
 
-
 export const placeOrder = (
     shopId: string,
     studentId: string,
     cart: { itemId: string; quantity: number }[],
     pin: string,
-    deliveryMethod: 'pickup' | 'delivery',
-    deliveryDetails?: string
+    deliveryMethod: 'pickup' | 'delivery'
 ): CanteenOrder => {
     const student = findUserById(studentId);
     if (!student) throw new Error("Student not found.");
@@ -242,18 +241,9 @@ export const placeOrder = (
 
     const totalAmount = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
-    // 1. Verify PIN
-    if (!eWalletService.verifyPin(studentId, pin)) {
-        throw new Error("Invalid PIN.");
-    }
-    
-    // 2. Check available balance
-    const availableBalance = eWalletService.getAvailableBalance(studentId);
-    if (availableBalance < totalAmount) {
-        throw new Error("Insufficient available funds. Your balance might be held for other pending orders.");
-    }
+    if (!eWalletService.verifyPin(studentId, pin)) throw new Error("Invalid PIN.");
+    if (eWalletService.getAvailableBalance(studentId) < totalAmount) throw new Error("Insufficient available funds.");
 
-    // 3. Create a pending transaction to hold the funds
     const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const transaction = eWalletService.createTransaction({
         walletUserId: studentId,
@@ -265,8 +255,46 @@ export const placeOrder = (
         method: 'e-wallet',
         orderId: orderId,
     });
+    
+    let assignedTable: string | null = null;
+    let assignedSlotStart: number | null = null;
+    let assignedSlotEnd: number | null = null;
 
-    // 4. Create the order
+    if (deliveryMethod === 'delivery') {
+        const settings = getCanteenSettings(shop.schoolId);
+        const { totalStudents, breakfastMinutes, breakfastStartTime, tables } = settings.seatSettings;
+        const totalCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
+
+        if (totalCapacity > 0 && totalStudents > 0 && breakfastMinutes > 0) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const todaysOrders = getOrders().filter(o => o.timestamp >= today.getTime() && o.deliveryMethod === 'delivery');
+            
+            const orderCount = todaysOrders.length;
+            
+            const numberOfBatches = Math.ceil(totalStudents / totalCapacity);
+            const timePerBatchMs = (breakfastMinutes / numberOfBatches) * 60 * 1000;
+
+            const [startHour, startMinute] = breakfastStartTime.split(':').map(Number);
+            const breakfastStartTimestamp = new Date(today).setHours(startHour, startMinute, 0, 0);
+
+            const currentBatchIndex = Math.floor(orderCount / totalCapacity);
+            let orderIndexInBatch = orderCount % totalCapacity;
+            
+            assignedSlotStart = breakfastStartTimestamp + (currentBatchIndex * timePerBatchMs);
+            assignedSlotEnd = assignedSlotStart + timePerBatchMs;
+
+            let cumulativeCapacity = 0;
+            for (const table of tables) {
+                if (orderIndexInBatch < table.capacity) {
+                    assignedTable = table.label;
+                    break;
+                }
+                orderIndexInBatch -= table.capacity;
+            }
+        }
+    }
+
     const newOrder: CanteenOrder = {
         id: orderId,
         shopId,
@@ -278,27 +306,13 @@ export const placeOrder = (
         timestamp: Date.now(),
         transactionId: transaction.id,
         deliveryMethod,
-        deliveryDetails,
+        assignedTable,
+        assignedSlotStart,
+        assignedSlotEnd,
     };
     const orders = getOrders();
     orders.push(newOrder);
     saveOrders(orders);
-
-    if (deliveryMethod === 'delivery' && deliveryDetails) {
-        const notifications = getDeliveryNotifications();
-        const newNotification: DeliveryNotification = {
-            id: `del_notif_${Date.now()}`,
-            orderId: newOrder.id,
-            studentId: studentId,
-            studentName: student.name,
-            shopId: shopId,
-            tableNumber: deliveryDetails,
-            timestamp: Date.now(),
-            status: 'pending'
-        };
-        notifications.push(newNotification);
-        saveDeliveryNotifications(notifications);
-    }
     
     return newOrder;
 };
@@ -314,25 +328,19 @@ export const completeScannedOrder = (orderId: string, requestingUserId: string):
         throw new Error(`Order is not ready for pickup. Current status: ${order.status}`);
     }
     
-    // Security check
     const shop = getShops().find(s => s.id === order.shopId);
     if (!shop || shop.ownerId !== requestingUserId) {
         throw new Error("You are not authorized to complete this order.");
     }
 
-    // Settle the payment
-    if (!order.transactionId) {
-        throw new Error("Order has no associated transaction to complete.");
-    }
-    // Settle the payment
+    if (!order.transactionId) throw new Error("Order has no associated transaction to complete.");
+    
     eWalletService.settleOrderPayment(order.id, order.shopId);
 
-    // Update order status
     order.status = 'completed';
     orders[orderIndex] = order;
     saveOrders(orders);
 
-    // Generate receipts
     if (!shop.ownerId) throw new Error("Could not find shop owner to create receipt.");
 
     createReceipt({
@@ -393,22 +401,54 @@ export const cancelStudentOrder = (orderId: string, studentId: string): void => 
     
     const order = orders[orderIndex];
     
-    if (order.studentId !== studentId) {
-        throw new Error("You are not authorized to cancel this order.");
-    }
-    
-    if (order.status !== 'pending') {
-        throw new Error("Only pending orders can be cancelled.");
-    }
+    if (order.studentId !== studentId) throw new Error("You are not authorized to cancel this order.");
+    if (order.status !== 'pending') throw new Error("Only pending orders can be cancelled.");
 
     order.status = 'cancelled';
     
-    if (order.transactionId) {
-        eWalletService.cancelOrderPayment(order.id);
-    }
+    if (order.transactionId) eWalletService.cancelOrderPayment(order.id);
     
     orders[orderIndex] = order;
     saveOrders(orders);
+};
+
+export const getOrderForAttendanceCheck = (studentId: string, schoolId: string): CanteenOrder | null => {
+    const studentOrders = getOrdersForStudent(studentId).filter(o => o.status === 'pending' && o.deliveryMethod === 'delivery');
+    const now = Date.now();
+    // Find an order whose time slot is current or very recent
+    return studentOrders.find(o => o.assignedSlotStart && o.assignedSlotEnd && now >= (o.assignedSlotStart - 5 * 60 * 1000) && now <= o.assignedSlotEnd) || null;
+};
+
+export const signInForCanteenAttendance = (orderId: string): void => {
+    const order = getOrderById(orderId);
+    if (!order) throw new Error("Order not found.");
+    if (order.status !== 'pending') throw new Error("This order is not pending attendance.");
+    if (!order.assignedTable) throw new Error("This order has no assigned table.");
+    if (!order.assignedSlotStart) throw new Error("This order has no assigned time slot.");
+
+    const now = Date.now();
+    const gracePeriod = 15 * 60 * 1000; // 15 minutes
+    if (now < order.assignedSlotStart - gracePeriod || now > order.assignedSlotEnd! + gracePeriod) {
+        throw new Error("It is not currently your assigned time slot.");
+    }
+    
+    const notifications = getDeliveryNotifications();
+    if (notifications.some(n => n.orderId === orderId)) {
+        throw new Error("A delivery notification for this order already exists.");
+    }
+    
+    const newNotification: DeliveryNotification = {
+        id: `del_notif_${Date.now()}`,
+        orderId: order.id,
+        studentId: order.studentId,
+        studentName: order.studentName,
+        shopId: order.shopId,
+        tableNumber: order.assignedTable,
+        timestamp: Date.now(),
+        status: 'pending'
+    };
+    notifications.push(newNotification);
+    saveDeliveryNotifications(notifications);
 };
 
 
@@ -439,7 +479,8 @@ export const markNotificationAsServed = (notificationId: string): void => {
     const notifications = getDeliveryNotifications();
     const index = notifications.findIndex(n => n.id === notificationId);
     if (index > -1) {
-        notifications[index].status = 'served';
+        // Instead of changing status, we'll remove it from the list
+        notifications.splice(index, 1);
         saveDeliveryNotifications(notifications);
     }
 };
