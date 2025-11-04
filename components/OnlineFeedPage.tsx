@@ -90,7 +90,6 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     const [isDragOver, setIsDragOver] = useState(false);
     const savedSelectionRef = useRef<Range | null>(null);
 
-    // --- NEW: State for the link modal ---
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
 
@@ -155,27 +154,31 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
         if (!editorRef.current || !linkUrl.trim()) return;
         
         editorRef.current.focus();
-        restoreSelection(); // Restore the highlighted text
+        restoreSelection();
         
         // Use execCommand to create the link
         document.execCommand('createLink', false, linkUrl);
         
-        // Post-processing: find the link and add attributes
+        // Find the newly created link and apply button styles
         const selection = window.getSelection();
         if (selection && selection.focusNode) {
             let parentElement = selection.focusNode.parentElement;
-            // Traverse up to find the 'A' tag if the focusNode is a text node
+            // Traverse up to find the <a> tag
             while (parentElement && parentElement.tagName !== 'A') {
                 parentElement = parentElement.parentElement;
             }
             if (parentElement && parentElement.tagName === 'A') {
-                parentElement.style.color = '#22d3ee'; // tailwind cyan-400
-                parentElement.setAttribute('target', '_blank');
-                parentElement.setAttribute('rel', 'noopener noreferrer');
+                // Apply Tailwind classes for a button-like appearance
+                parentElement.className = "bg-cyan-600 text-white px-3 py-1 rounded-full inline-block text-sm font-semibold no-underline hover:bg-cyan-700 transition-colors shadow-md";
+                
+                // Handle external links to open in a new tab
+                if (!linkUrl.startsWith('#/') && !linkUrl.startsWith(window.location.origin)) {
+                    parentElement.setAttribute('target', '_blank');
+                    parentElement.setAttribute('rel', 'noopener noreferrer');
+                }
             }
         }
         
-        // Cleanup
         setIsLinkModalOpen(false);
         setLinkUrl('');
         savedSelectionRef.current = null;
@@ -210,7 +213,7 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
                 }
             }
         }
-        savedSelectionRef.current = null; // Clear after use
+        savedSelectionRef.current = null;
     };
 
     const handleAttachmentClick = (acceptType: string) => {
@@ -243,10 +246,19 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const urlRegex = /(https?:\/\/[^\s]+|#\/marketplace\/view\/listing\/[^\s]+)/g;
 
         const sanitizedText = text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        const linkedText = sanitizedText.replace(urlRegex, (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #22d3ee;">${url}</a>`);
+        
+        const linkedText = sanitizedText.replace(urlRegex, (url) => {
+            if (url.startsWith('#/')) {
+                // Internal link, handled by PostRenderer's click handler
+                return `<a href="${url}" style="color: #22d3ee;">${url}</a>`;
+            } else {
+                // External link, opens in a new tab
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color: #22d3ee;">${url}</a>`;
+            }
+        });
         document.execCommand('insertHTML', false, linkedText);
     };
 
@@ -379,6 +391,40 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     );
 };
 
+const PostRenderer: React.FC<{ content: string; onInternalLinkClick: (path: string) => void }> = ({ content, onInternalLinkClick }) => {
+    const sanitizedContent = useMemo(() => {
+        const DOMPurify = (window as any).DOMPurify;
+        if (!DOMPurify) return content;
+        return DOMPurify.sanitize(content, { ADD_ATTR: ['target', 'rel', 'style'], ADD_TAGS: ['video'], ADD_CLASSES: { 'a': true } });
+    }, [content]);
+
+    const handleContentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        let target = e.target as HTMLElement;
+        while (target && target.tagName !== 'A' && target.parentElement) {
+            if (target.parentElement.classList.contains('prose')) break;
+            target = target.parentElement;
+        }
+
+        if (target.tagName === 'A') {
+            const anchor = target as HTMLAnchorElement;
+            const href = anchor.getAttribute('href');
+
+            if (href && href.startsWith('#/marketplace/view/listing/')) {
+                e.preventDefault();
+                onInternalLinkClick(href);
+            }
+        }
+    };
+
+    return (
+        <div
+            onClick={handleContentClick}
+            className="prose prose-sm prose-invert max-w-none text-gray-300 [&_img]:rounded-lg [&_video]:rounded-lg [&_img]:max-h-96 [&_video]:max-h-96 [&_img]:mx-auto [&_video]:mx-auto"
+            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+        />
+    );
+};
+
 // Events View
 const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMapClick: (uri: string) => void }> = ({ user, school, onMapClick }) => {
     const [events, setEvents] = useState<Event[]>([]);
@@ -411,16 +457,13 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
 
     const [formState, setFormState] = useState<Omit<Event, 'id' | 'createdAt' | 'createdBy' | 'schoolId'>>(initialFormState);
     
-    // State for location search
     const [placeSearch, setPlaceSearch] = useState('');
     const [placeSuggestions, setPlaceSuggestions] = useState<Place[]>([]);
     const [isSearchingPlaces, setIsSearchingPlaces] = useState(false);
     const debounceTimeout = useRef<number | null>(null);
 
-    // Confirmation modal for deletion
     const [confirmModal, setConfirmModal] = useState<{ message: React.ReactNode; onConfirm: () => void; } | null>(null);
 
-    // File previews
     const [attachmentPreviews, setAttachmentPreviews] = useState<{ name: string; type: string; }[]>([]);
 
 
@@ -510,7 +553,6 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
         setIsSearchingPlaces(true);
         debounceTimeout.current = window.setTimeout(async () => {
             try {
-                // A mock location, replace with real geolocation if available
                 const suggestions = await getPlaceSuggestionsFromAI(query, { latitude: 0.3476, longitude: 32.5825 });
                 setPlaceSuggestions(suggestions);
             } catch (error) {
@@ -533,7 +575,6 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
 
         const { startTime, endTime } = formState;
 
-        // Convert local datetime-local string to timestamp
         const startTimestamp = new Date(startTime).getTime();
         const endTimestamp = new Date(endTime).getTime();
 
@@ -574,7 +615,6 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
             <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl space-y-4 max-h-[90vh] flex flex-col">
                 <h3 className="text-xl font-bold">{editingEvent ? 'Edit Event' : 'Create New Event'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto pr-2">
-                    {/* Inputs for title, description, banner, logo */}
                     <div>
                         <label className="text-sm">Event Title</label>
                         <input name="title" value={formState.title} onChange={handleFormChange} required className="w-full p-2 bg-gray-700 rounded mt-1" />
@@ -593,7 +633,6 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
                             <input type="file" onChange={(e) => handleFileChange(e, 'logoUrl')} className="w-full text-xs" />
                         </div>
                     </div>
-                    {/* Time inputs */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-sm">Start Time</label>
@@ -604,7 +643,6 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
                             <input type="datetime-local" name="endTime" value={formState.endTime ? new Date(formState.endTime).toISOString().slice(0, 16) : ''} onChange={handleFormChange} required className="w-full p-2 bg-gray-700 rounded mt-1" />
                         </div>
                     </div>
-                    {/* Location input */}
                     <div className="relative">
                         <label className="text-sm">Location</label>
                         <input value={placeSearch} onChange={handlePlaceSearchChange} placeholder="Search for a location..." required className="w-full p-2 bg-gray-700 rounded mt-1" />
@@ -617,7 +655,6 @@ const EventsView: React.FC<{ user: User | AdminUser; school: School | null, onMa
                             </div>
                         )}
                     </div>
-                     {/* Attachments */}
                     <div>
                         <label className="text-sm">Attachments</label>
                         <input type="file" multiple onChange={(e) => handleFileChange(e, 'attachments')} className="w-full text-xs mt-1" />
@@ -1210,7 +1247,7 @@ const UserProfileModal: React.FC<{
 
     const handleFollowClick = () => {
         groupService.toggleFollow(currentUserId, targetUserId);
-        refreshFollowData(); // Re-fetch data to update UI
+        refreshFollowData();
     };
 
     const handleMessageClick = () => {
@@ -1382,15 +1419,12 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
     
     const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
     
-    // State for Stories
     const [storiesByUser, setStoriesByUser] = useState<Record<string, Story[]>>({});
     const [viewingStoriesOfUser, setViewingStoriesOfUser] = useState<User | AdminUser | null>(null);
     const [isAddStoryModalOpen, setIsAddStoryModalOpen] = useState(false);
 
-    // State for feed posts
     const [feedPosts, setFeedPosts] = useState<GroupPost[]>([]);
     
-    // State for post management
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
     const [postToDelete, setPostToDelete] = useState<GroupPost | null>(null);
     const [editingPostId, setEditingPostId] = useState<string | null>(null);
@@ -1398,12 +1432,10 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
     const [hiddenPostIds, setHiddenPostIds] = useState<Set<string>>(new Set());
     const menuRef = useRef<HTMLDivElement>(null);
 
-    // State for comments
     const [comments, setComments] = useState<Record<string, PostComment[]>>({});
     const [commentingOnPostId, setCommentingOnPostId] = useState<string | null>(null);
     const [newComment, setNewComment] = useState('');
 
-    // State for "See More" feature
     const [expandedPosts, setExpandedPosts] = useState<Set<string>>(new Set());
     const [profileModalUser, setProfileModalUser] = useState<User | AdminUser | null>(null);
     
@@ -1428,6 +1460,10 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
 
     const observer = useRef<IntersectionObserver | null>(null);
     const viewedPostsRef = useRef(new Set<string>());
+
+    const handleInternalLinkClick = (path: string) => {
+        window.location.hash = path;
+    };
 
     useEffect(() => {
         const handleHashChange = () => {
@@ -1526,8 +1562,8 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
     const handleStartMiniChat = (targetUserId: string) => {
         const target = findFullUserById(targetUserId);
         if (target) {
-            setProfileModalUser(null); // Close profile modal
-            setChatTarget(target); // Open mini chat
+            setProfileModalUser(null);
+            setChatTarget(target);
         }
     };
     
@@ -1638,7 +1674,6 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
             default:
                 return (
                     <div className="space-y-6">
-                        {/* Stories Reel */}
                         <div className="bg-gray-800 p-4 rounded-lg">
                             <div className="flex items-center space-x-4 overflow-x-auto pb-2 -mx-4 px-4">
                                 <div onClick={() => setIsAddStoryModalOpen(true)} className="flex flex-col items-center space-y-1 cursor-pointer flex-shrink-0 w-20 text-center">
@@ -1664,10 +1699,8 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                             </div>
                         </div>
 
-                        {/* New Post Composer */}
                         <PostComposer user={currentUser!} onPost={handlePost} />
 
-                        {/* Dynamic Feed Posts */}
                         {feedPosts.filter(post => !hiddenPostIds.has(post.id) && !post.isDeleted).map(post => {
                             const isAuthor = post.authorId === currentUserId;
                             const isEditing = editingPostId === post.id;
@@ -1675,7 +1708,6 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                             const userHasDisliked = post.reactions?.['👎']?.includes(currentUserId);
                             const isExpanded = expandedPosts.has(post.id);
                             
-                            // Check for long posts after stripping HTML tags
                             const tempDiv = document.createElement("div");
                             tempDiv.innerHTML = post.content;
                             const postTextContent = tempDiv.textContent || tempDiv.innerText || "";
@@ -1722,10 +1754,7 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                                         </div>
                                     ) : (
                                         <div>
-                                            <div
-                                                className={`prose prose-sm prose-invert max-w-none text-gray-300 [&_img]:rounded-lg [&_video]:rounded-lg [&_img]:max-h-96 [&_video]:max-h-96 [&_img]:mx-auto [&_video]:mx-auto ${isLongPost && !isExpanded ? 'line-clamp-4' : ''}`}
-                                                dangerouslySetInnerHTML={{ __html: post.content }}
-                                            />
+                                            <PostRenderer content={post.content} onInternalLinkClick={handleInternalLinkClick} />
                                             {isLongPost && (
                                                 <button onClick={() => toggleReadMore(post.id)} className="text-cyan-400 hover:underline text-sm mt-2">
                                                     {isExpanded ? 'See less' : 'See more'}
@@ -1868,16 +1897,13 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
             
             <aside className="hidden xl:block w-72 bg-gray-800 p-4 border-l border-gray-700">
                 <h3 className="font-bold mb-4">Announcements</h3>
-                {/* Placeholder content */}
             </aside>
             
-            {/* Modals and Overlays */}
             {isProfileOpen && (
                 <ProfilePage
                     user={currentUser}
                     onClose={() => setIsProfileOpen(false)}
                     onProfileUpdate={(updatedUser) => {
-                        // Logic to update user state if needed
                     }}
                 />
             )}
