@@ -90,6 +90,10 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     const [isDragOver, setIsDragOver] = useState(false);
     const savedSelectionRef = useRef<Range | null>(null);
 
+    // --- NEW: State for the link modal ---
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [linkUrl, setLinkUrl] = useState('');
+
     const saveSelection = () => {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0 && editorRef.current?.contains(selection.anchorNode)) {
@@ -135,23 +139,48 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
 
     const handleLink = () => {
         if (!editorRef.current) return;
-        editorRef.current.focus();
+        
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+            alert("Please highlight the text you want to turn into a link first.");
+            return;
+        }
+
         saveSelection();
-
-        const url = prompt("Enter the URL:", "https://");
-        restoreSelection();
-
-        if (url) {
-            const selection = window.getSelection();
-            document.execCommand('createLink', false, url);
-            const parentElement = selection?.focusNode?.parentElement;
+        setLinkUrl('https://');
+        setIsLinkModalOpen(true);
+    };
+    
+    const handleAddLink = () => {
+        if (!editorRef.current || !linkUrl.trim()) return;
+        
+        editorRef.current.focus();
+        restoreSelection(); // Restore the highlighted text
+        
+        // Use execCommand to create the link
+        document.execCommand('createLink', false, linkUrl);
+        
+        // Post-processing: find the link and add attributes
+        const selection = window.getSelection();
+        if (selection && selection.focusNode) {
+            let parentElement = selection.focusNode.parentElement;
+            // Traverse up to find the 'A' tag if the focusNode is a text node
+            while (parentElement && parentElement.tagName !== 'A') {
+                parentElement = parentElement.parentElement;
+            }
             if (parentElement && parentElement.tagName === 'A') {
                 parentElement.style.color = '#22d3ee'; // tailwind cyan-400
                 parentElement.setAttribute('target', '_blank');
                 parentElement.setAttribute('rel', 'noopener noreferrer');
             }
         }
+        
+        // Cleanup
+        setIsLinkModalOpen(false);
+        setLinkUrl('');
+        savedSelectionRef.current = null;
     };
+
 
     const processFiles = async (files: FileList) => {
         if (savedSelectionRef.current) {
@@ -267,58 +296,86 @@ const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: str
     const editorIsEmpty = !editorRef.current?.innerHTML.trim() || editorRef.current?.innerHTML.trim() === '<br>';
 
     return (
-        <div 
-            className={`bg-gray-800 rounded-lg transition-all duration-200 ${isDragOver ? 'border-2 border-dashed border-cyan-500' : 'border-2 border-transparent'}`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-        >
-            <div className="flex items-start gap-3 p-4">
-                <UserAvatar name={user.name} avatarUrl={user.avatarUrl} className="w-10 h-10 rounded-full flex-shrink-0" />
-                <div className="w-full">
-                    <input
-                        type="text"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Post Title..."
-                        className="w-full bg-transparent text-xl font-bold pb-2 focus:outline-none placeholder-gray-400 border-b border-gray-700"
-                    />
-                    <div 
-                        ref={editorRef}
-                        contentEditable="true"
-                        onPaste={handlePaste}
-                        data-placeholder={`What's on your mind, ${user.name.split(' ')[0]}?`}
-                        className="w-full bg-transparent p-3 -ml-3 mt-2 min-h-[84px] max-h-60 overflow-y-auto focus:outline-none prose prose-sm prose-invert max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400"
-                    />
+        <>
+            <div 
+                className={`bg-gray-800 rounded-lg transition-all duration-200 ${isDragOver ? 'border-2 border-dashed border-cyan-500' : 'border-2 border-transparent'}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+            >
+                <div className="flex items-start gap-3 p-4">
+                    <UserAvatar name={user.name} avatarUrl={user.avatarUrl} className="w-10 h-10 rounded-full flex-shrink-0" />
+                    <div className="w-full">
+                        <input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            placeholder="Post Title..."
+                            className="w-full bg-transparent text-xl font-bold pb-2 focus:outline-none placeholder-gray-400 border-b border-gray-700"
+                        />
+                        <div 
+                            ref={editorRef}
+                            contentEditable="true"
+                            onPaste={handlePaste}
+                            data-placeholder={`What's on your mind, ${user.name.split(' ')[0]}?`}
+                            className="w-full bg-transparent p-3 -ml-3 mt-2 min-h-[84px] max-h-60 overflow-y-auto focus:outline-none prose prose-sm prose-invert max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400"
+                        />
+                    </div>
                 </div>
+                
+                <div className="mt-3 p-4 border-t border-gray-700 flex justify-between items-center">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                        <button type="button" onClick={() => handleAttachmentClick('image/*')} title="Add Photos" className="p-2 text-gray-400 hover:text-green-500 hover:bg-gray-700 rounded-full transition-colors">
+                            <IconComposerPhoto />
+                        </button>
+                        <button type="button" onClick={() => handleAttachmentClick('video/*')} title="Add Video" className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-700 rounded-full transition-colors">
+                            <IconComposerVideo />
+                        </button>
+                        <button type="button" onClick={() => handleAttachmentClick('.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt')} title="Attach File" className="p-2 text-gray-400 hover:text-blue-500 hover:bg-gray-700 rounded-full transition-colors">
+                            <IconComposerFile />
+                        </button>
+                        <button type="button" onClick={handleLink} title="Add Link" className="p-2 text-gray-400 hover:text-cyan-500 hover:bg-gray-700 rounded-full transition-colors">
+                            <IconLink />
+                        </button>
+                    </div>
+                    <button onClick={handlePost} className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold disabled:opacity-50" disabled={!title.trim() || editorIsEmpty}>Post</button>
+                </div>
+                
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
+                />
             </div>
             
-            <div className="mt-3 p-4 border-t border-gray-700 flex justify-between items-center">
-                <div className="flex items-center gap-1 sm:gap-2">
-                    <button type="button" onClick={() => handleAttachmentClick('image/*')} title="Add Photos" className="p-2 text-gray-400 hover:text-green-500 hover:bg-gray-700 rounded-full transition-colors">
-                        <IconComposerPhoto />
-                    </button>
-                    <button type="button" onClick={() => handleAttachmentClick('video/*')} title="Add Video" className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-700 rounded-full transition-colors">
-                        <IconComposerVideo />
-                    </button>
-                    <button type="button" onClick={() => handleAttachmentClick('.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt')} title="Attach File" className="p-2 text-gray-400 hover:text-blue-500 hover:bg-gray-700 rounded-full transition-colors">
-                        <IconComposerFile />
-                    </button>
-                    <button type="button" onClick={handleLink} title="Add Link" className="p-2 text-gray-400 hover:text-cyan-500 hover:bg-gray-700 rounded-full transition-colors">
-                        <IconLink />
-                    </button>
+            {isLinkModalOpen && (
+                <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50 p-4 animate-fade-in-up">
+                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md space-y-4">
+                        <h3 className="text-xl font-bold">Embed Link</h3>
+                        <p className="text-sm text-gray-400">Enter the URL you want to link to the selected text.</p>
+                        <div>
+                            <label htmlFor="link-url" className="text-xs text-gray-400">URL</label>
+                            <input 
+                                id="link-url"
+                                type="url"
+                                value={linkUrl}
+                                onChange={e => setLinkUrl(e.target.value)}
+                                placeholder="https://example.com"
+                                className="w-full p-2 bg-gray-700 rounded mt-1 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddLink(); } }}
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <button onClick={() => setIsLinkModalOpen(false)} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">Cancel</button>
+                            <button onClick={handleAddLink} className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold">Add Link</button>
+                        </div>
+                    </div>
                 </div>
-                <button onClick={handlePost} className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold disabled:opacity-50" disabled={!title.trim() || editorIsEmpty}>Post</button>
-            </div>
-            
-            <input
-                type="file"
-                ref={fileInputRef}
-                multiple
-                onChange={handleFileChange}
-                className="hidden"
-            />
-        </div>
+            )}
+        </>
     );
 };
 
