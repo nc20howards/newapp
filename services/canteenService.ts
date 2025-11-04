@@ -329,7 +329,10 @@ export const completeScannedOrder = (orderId: string, requestingUserId: string):
     }
     
     const shop = getShops().find(s => s.id === order.shopId);
-    if (!shop || shop.ownerId !== requestingUserId) {
+    const isOwner = shop?.ownerId === requestingUserId;
+    const isCarrier = shop?.carrierIds?.includes(requestingUserId);
+
+    if (!shop || (!isOwner && !isCarrier)) {
         throw new Error("You are not authorized to complete this order.");
     }
 
