@@ -1,7 +1,7 @@
-import React, { Suspense, useState, useRef } from 'react';
-import { Canvas, ThreeEvent } from '@react-three/fiber';
+import React, { Suspense, useState, useRef, useEffect } from 'react';
+import { Canvas, ThreeEvent, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, Html, Loader } from '@react-three/drei';
-import { ARButton, XR, useXR, useHitTest, Interactive, XRInteractionEvent } from '@react-three/xr';
+import { ARButton, XR, useXR, Interactive, XRInteractionEvent } from '@react-three/xr';
 import { Group, Mesh } from 'three';
 import { ExplorationItem, User } from '../types';
 import * as apiService from '../services/apiService';
@@ -75,11 +75,53 @@ function ARExperience({ item, setAnnotation }: { item: ExplorationItem, setAnnot
     const [scale, setScale] = useState(0.2);
     const [rotationY, setRotationY] = useState(0);
 
-    // Use hit-test to find a surface and move the reticle
-    useHitTest(hitMatrix => {
-        if (reticleRef.current && !isPlaced) {
-            hitMatrix.decompose(reticleRef.current.position, reticleRef.current.quaternion, reticleRef.current.scale);
-            reticleRef.current.visible = true;
+    const { isPresenting, session, player } = useXR()
+    const hitTestSourceRef = useRef<any | null>(null);
+
+    useEffect(() => {
+        if (!isPresenting || !session) return;
+        
+        const setupHitTestSource = async () => {
+            try {
+                const viewerReferenceSpace = await session.requestReferenceSpace!('viewer');
+                const source = await session.requestHitTestSource!({ space: viewerReferenceSpace });
+                hitTestSourceRef.current = source;
+            } catch (error) {
+                console.error("Failed to create hit test source:", error);
+            }
+        };
+        
+        setupHitTestSource();
+      
+        return () => {
+          if (hitTestSourceRef.current) {
+            hitTestSourceRef.current.cancel();
+          }
+          hitTestSourceRef.current = null;
+        }
+    }, [isPresenting, session]);
+
+    useFrame((_, frame) => {
+        if (!isPresenting || !hitTestSourceRef.current || isPlaced || !frame) {
+            if (reticleRef.current) reticleRef.current.visible = false;
+            return;
+        };
+        
+        const hitTestResults = frame.getHitTestResults(hitTestSourceRef.current);
+        
+        if (hitTestResults.length > 0) {
+            const hit = hitTestResults[0];
+            const referenceSpace = player; // useXR returns player which is the XRReferenceSpace
+            const pose = hit.getPose(referenceSpace);
+            if (reticleRef.current && pose) {
+                reticleRef.current.matrix.fromArray(pose.transform.matrix);
+                reticleRef.current.matrix.decompose(reticleRef.current.position, reticleRef.current.quaternion, reticleRef.current.scale);
+                reticleRef.current.visible = true;
+            }
+        } else {
+            if (reticleRef.current) {
+                reticleRef.current.visible = false;
+            }
         }
     });
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, School, ElectionSettings, VotingCategory, Contestant } from '../types';
 import * as voteService from '../services/voteService';
-import ConfirmationModal from './ConfirmationModal';
 import UserAvatar from './UserAvatar';
+import ConfirmationModal from './ConfirmationModal';
 
 interface EVoteStudentPageProps {
     user: User;
@@ -14,220 +14,211 @@ const EVoteStudentPage: React.FC<EVoteStudentPageProps> = ({ user, school }) => 
     const [categories, setCategories] = useState<VotingCategory[]>([]);
     const [contestants, setContestants] = useState<Contestant[]>([]);
     const [hasVoted, setHasVoted] = useState(false);
-    const [electionStatus, setElectionStatus] = useState<'loading' | 'upcoming' | 'open' | 'closed'>('loading');
-    const [timeLeft, setTimeLeft] = useState('');
-    
-    const [selectedChoices, setSelectedChoices] = useState<Record<string, string>>({});
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [selections, setSelections] = useState<Record<string, string>>({});
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
     const [error, setError] = useState('');
+    const [viewResultsMode, setViewResultsMode] = useState<'winners' | 'details'>('winners');
 
     useEffect(() => {
-        const schoolId = school.id;
-        const studentId = user.studentId;
+        const refreshData = () => {
+            const settingsData = voteService.getElectionSettings(school.id);
+            setSettings(settingsData);
+            setCategories(voteService.getCategoriesForSchool(school.id));
+            setContestants(voteService.getContestantsForSchool(school.id));
+            setHasVoted(voteService.hasStudentVoted(user.studentId, school.id));
+        };
         
-        const electionSettings = voteService.getElectionSettings(schoolId);
-        setSettings(electionSettings);
-        setCategories(voteService.getCategoriesForSchool(schoolId));
-        setContestants(voteService.getContestantsForSchool(schoolId));
-        setHasVoted(voteService.hasStudentVoted(studentId, schoolId));
-
-        const now = Date.now();
-        if (!electionSettings.isVotingOpen) {
-            setElectionStatus('closed');
-        } else if (now < electionSettings.startTime) {
-            setElectionStatus('upcoming');
-        } else if (now > electionSettings.endTime) {
-            setElectionStatus('closed');
-        } else {
-            setElectionStatus('open');
-        }
-    }, [school.id, user.studentId]);
-
-    // Countdown timer effect
-    useEffect(() => {
-        if (!settings) return;
-        const interval = setInterval(() => {
-            const now = Date.now();
-            if (now < settings.startTime) {
-                const distance = settings.startTime - now;
-                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                setTimeLeft(`${days}d ${hours}h ${minutes}m`);
-                setElectionStatus('upcoming');
-            } else if (now >= settings.startTime && now <= settings.endTime) {
-                const distance = settings.endTime - now;
-                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                setTimeLeft(`${days}d ${hours}h ${minutes}m left`);
-                setElectionStatus('open');
-            } else {
-                setTimeLeft('Ended');
-                setElectionStatus('closed');
-                clearInterval(interval);
-            }
-        }, 1000);
+        refreshData();
+        const interval = setInterval(refreshData, 2000); // Poll for live results
         return () => clearInterval(interval);
-    }, [settings]);
+    }, [user.studentId, school.id]);
 
-    const handleSelectChoice = (categoryId: string, contestantId: string) => {
-        setSelectedChoices(prev => ({ ...prev, [categoryId]: contestantId }));
+    const now = useMemo(() => Date.now(), []);
+    const isElectionOver = useMemo(() => settings ? now > settings.endTime : false, [settings, now]);
+    const isVotingOpen = useMemo(() => settings ? settings.isVotingOpen && now >= settings.startTime && now <= settings.endTime : false, [settings, now]);
+
+    const handleSelectContestant = (categoryId: string, contestantId: string) => {
+        setSelections(prev => ({ ...prev, [categoryId]: contestantId }));
     };
 
-    const handleConfirmVote = () => {
+    const handleSubmitVote = () => {
         setError('');
+        if (Object.keys(selections).length !== categories.length) {
+            setError('You must select a candidate for every category.');
+            return;
+        }
+        setConfirmModalOpen(true);
+    };
+    
+    const confirmVote = () => {
         try {
-            voteService.castVote(user.studentId, school.id, selectedChoices);
+            voteService.castVote(user.studentId, school.id, selections);
             setHasVoted(true);
-            setIsConfirmModalOpen(false);
-        } catch (e) {
-            setError((e as Error).message);
-            setIsConfirmModalOpen(false);
+            setContestants(voteService.getContestantsForSchool(school.id)); // Refresh contestants to show new vote count
+        } catch (err) {
+            setError((err as Error).message);
+        } finally {
+            setConfirmModalOpen(false);
         }
     };
-
-    const canSubmit = useMemo(() => {
-        return categories.length > 0 && categories.every(cat => selectedChoices[cat.id]);
-    }, [categories, selectedChoices]);
-
-    const totalVotesPerCategory = useMemo(() => {
-        if (electionStatus === 'closed') {
-            const totals: Record<string, number> = {};
-            categories.forEach(cat => {
-                totals[cat.id] = contestants
-                    .filter(c => c.categoryId === cat.id)
-                    .reduce((sum, c) => sum + c.votes, 0);
-            });
-            return totals;
-        }
-        return {};
-    }, [categories, contestants, electionStatus]);
-
-
-    if (electionStatus === 'loading' || !settings) {
-        return <div className="text-center p-8">Loading Election...</div>;
-    }
-
-    if (hasVoted) {
-        return (
-            <div className="text-center p-8 bg-gray-800 rounded-lg shadow-xl">
-                <h3 className="text-2xl font-bold text-green-400">Thank You for Voting!</h3>
-                <p className="text-gray-300 mt-2">Your vote has been cast successfully.</p>
-                {electionStatus === 'closed' && (
-                    <button onClick={() => setHasVoted(false)} className="mt-4 px-4 py-2 bg-cyan-600 rounded-md">View Results</button>
-                )}
-            </div>
-        );
-    }
     
-    if (electionStatus === 'closed') {
-        // Results View
-        return (
-            <div>
-                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">Election Results</h2>
-                <p className="text-gray-400 mb-6">The voting period has ended. Here are the final results.</p>
-                <div className="space-y-6">
-                    {categories.map(category => {
-                        const categoryContestants = contestants
-                            .filter(c => c.categoryId === category.id)
-                            .sort((a, b) => b.votes - a.votes);
-                        
-                        return (
-                            <div key={category.id} className="bg-gray-800 p-6 rounded-lg">
-                                <h3 className="text-xl font-bold text-cyan-400 mb-4">{category.title}</h3>
-                                <div className="space-y-4">
-                                    {categoryContestants.map((contestant, index) => {
-                                        const categoryTotal = totalVotesPerCategory[category.id] || 1;
-                                        const percentage = (contestant.votes / categoryTotal) * 100;
-                                        return (
-                                        <div key={contestant.id}>
-                                            <div className="flex justify-between items-center text-sm mb-1">
-                                                <p className={`font-semibold ${index === 0 ? 'text-yellow-400' : 'text-white'}`}>{index + 1}. {contestant.name}</p>
-                                                <p className="font-bold">{contestant.votes} Votes ({percentage.toFixed(1)}%)</p>
-                                            </div>
-                                            <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                                <div className={`h-2.5 rounded-full ${index === 0 ? 'bg-yellow-500' : 'bg-cyan-600'}`} style={{ width: `${percentage}%` }}></div>
-                                            </div>
-                                        </div>
-                                    )})}
+    // --- Sub-Components for Rendering ---
+
+    const ResultsView = () => {
+        const categoriesWithResults = useMemo(() => {
+            return categories.map(category => {
+                const categoryContestants = contestants
+                    .filter(c => c.categoryId === category.id)
+                    .sort((a, b) => b.votes - a.votes);
+                const categoryTotalVotes = categoryContestants.reduce((sum, c) => sum + c.votes, 0);
+                const winner = categoryContestants[0] || null;
+
+                return { ...category, contestants: categoryContestants, totalVotes: categoryTotalVotes, winner };
+            }).filter(c => c.contestants.length > 0);
+        }, [categories, contestants]);
+
+        if (viewResultsMode === 'winners' && isElectionOver) {
+            return (
+                <div className="space-y-8 animate-fade-in-up">
+                     <div className="flex justify-between items-center">
+                        <h3 className="text-2xl font-bold text-white">Election Winners</h3>
+                        <button onClick={() => setViewResultsMode('details')} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">View Detailed Results</button>
+                    </div>
+                    {categoriesWithResults.map(({ id, title, winner }) => (
+                         winner ? (
+                            <div key={id} className="bg-gradient-to-br from-cyan-700 to-gray-800 p-6 rounded-lg shadow-2xl relative overflow-hidden border-2 border-cyan-400">
+                                <div className="absolute inset-0 pointer-events-none fireworks-container">
+                                    <div style={{ top: '20%', left: '30%', animationDelay: '0s' }}></div>
+                                    <div style={{ top: '40%', left: '80%', animationDelay: '0.4s' }}></div>
+                                    <div style={{ top: '70%', left: '50%', animationDelay: '0.8s' }}></div>
+                                </div>
+                                <h4 className="text-xl font-bold text-yellow-300 mb-2">Winner: {title}</h4>
+                                <div className="flex items-center gap-4">
+                                    <UserAvatar name={winner.name} avatarUrl={winner.avatarUrl} className="w-20 h-20 rounded-full flex-shrink-0 border-4 border-yellow-300" />
+                                    <div>
+                                        <p className="font-bold text-2xl text-white">{winner.name}</p>
+                                        <p className="text-lg text-gray-300">{winner.class}</p>
+                                        <p className="font-bold text-yellow-300 mt-1">{winner.votes} Votes</p>
+                                    </div>
                                 </div>
                             </div>
-                        )
-                    })}
+                        ) : null
+                    ))}
                 </div>
-            </div>
-        );
-    }
+            );
+        }
 
-    if (electionStatus === 'upcoming') {
+        // Detailed view (default for live results or when toggled)
         return (
-            <div className="text-center p-8 bg-gray-800 rounded-lg shadow-xl">
-                <h3 className="text-2xl font-bold text-yellow-400">Voting Has Not Started Yet</h3>
-                <p className="text-gray-300 mt-2">Voting will open in:</p>
-                <p className="text-4xl font-mono font-bold mt-4">{timeLeft}</p>
-            </div>
-        );
-    }
-
-    // Voting View
-    return (
-        <div>
-            <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                title="Confirm Your Vote"
-                message="Are you sure you want to cast your vote? This action cannot be undone."
-                onConfirm={handleConfirmVote}
-                onCancel={() => setIsConfirmModalOpen(false)}
-                confirmText="Cast My Vote"
-            />
-            
-            <header className="mb-6">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white">E-Voting Portal</h2>
-                <div className="mt-2 p-3 bg-cyan-900/50 border border-cyan-700 rounded-lg text-center">
-                    <p className="font-semibold text-cyan-300">Voting is Open!</p>
-                    <p className="text-sm text-gray-300">Time remaining: <span className="font-mono">{timeLeft}</span></p>
+             <div className="space-y-8 animate-fade-in-up">
+                <div className="flex justify-between items-center">
+                    <h3 className="text-2xl font-bold text-white">{isElectionOver ? "Detailed Results" : "Live Results"}</h3>
+                    {isElectionOver && <button onClick={() => setViewResultsMode('winners')} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">Show Winners</button>}
                 </div>
-                {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
-            </header>
-            
-            <div className="space-y-8">
-                {categories.map(category => (
-                    <div key={category.id}>
-                        <h3 className="text-xl font-bold text-white mb-4">{category.title}</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {contestants.filter(c => c.categoryId === category.id).map(contestant => {
-                                const isSelected = selectedChoices[category.id] === contestant.id;
+                 {categoriesWithResults.map(({ id, title, contestants, totalVotes }) => (
+                     <div key={id} className="bg-gray-800 p-6 rounded-lg shadow-xl">
+                        <h4 className="text-xl font-bold text-cyan-400 mb-4">{title}</h4>
+                        <div className="space-y-4">
+                            {contestants.map(contestant => {
+                                const percentage = totalVotes > 0 ? (contestant.votes / totalVotes) * 100 : 0;
                                 return (
-                                    <div 
-                                        key={contestant.id}
-                                        className={`bg-gray-800 rounded-lg p-4 cursor-pointer border-2 transition-all ${isSelected ? 'border-cyan-500 ring-2 ring-cyan-500' : 'border-gray-700 hover:border-gray-600'}`}
-                                        onClick={() => handleSelectChoice(category.id, contestant.id)}
-                                    >
-                                        <div className="flex items-center space-x-4">
-                                            <UserAvatar name={contestant.name} avatarUrl={contestant.avatarUrl} className="w-16 h-16 rounded-full" />
-                                            <div>
-                                                <p className="font-bold text-lg">{contestant.name}</p>
-                                                <p className="text-sm text-gray-400">{contestant.class}</p>
+                                    <div key={contestant.id}>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="flex items-center gap-3">
+                                                <UserAvatar name={contestant.name} avatarUrl={contestant.avatarUrl} className="w-10 h-10 rounded-full" />
+                                                <div>
+                                                    <p className="font-semibold">{contestant.name}</p>
+                                                    <p className="text-xs text-gray-400">{contestant.class}</p>
+                                                </div>
                                             </div>
+                                            <div className="text-right">
+                                                <p className="font-bold">{contestant.votes} Votes</p>
+                                                <p className="text-xs font-semibold text-cyan-300">{percentage.toFixed(1)}%</p>
+                                            </div>
+                                        </div>
+                                        <div className="w-full bg-gray-700 rounded-full h-2.5">
+                                            <div className="bg-cyan-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
                                         </div>
                                     </div>
                                 )
                             })}
                         </div>
                     </div>
-                ))}
+                 ))}
             </div>
+        );
+    };
 
-            <footer className="mt-8 pt-4 border-t border-gray-700 text-center">
-                <button
-                    onClick={() => setIsConfirmModalOpen(true)}
-                    disabled={!canSubmit}
-                    className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-lg disabled:bg-gray-600 disabled:cursor-not-allowed"
-                >
-                    Cast Your Vote
-                </button>
-            </footer>
+    // --- Main Render Logic ---
+
+    if (!settings) {
+        return <div>Loading election details...</div>;
+    }
+
+    if (isElectionOver || (!settings.isVotingOpen && now > settings.startTime)) {
+        return <ResultsView />;
+    }
+
+    if (hasVoted) {
+        return (
+            <div>
+                 <div className="text-center p-8 bg-gray-800 rounded-lg mb-8">
+                    <h3 className="text-2xl font-bold text-green-400">Thank You for Voting!</h3>
+                    <p className="text-gray-300 mt-2">Your vote has been recorded. You can watch the live results below.</p>
+                </div>
+                <ResultsView />
+            </div>
+        );
+    }
+
+    if (isVotingOpen) {
+         return (
+            <div className="animate-slide-in-left-fade">
+                <ConfirmationModal isOpen={confirmModalOpen} title="Confirm Your Vote" message={<p>Are you sure? This action cannot be undone.</p>} onConfirm={confirmVote} onCancel={() => setConfirmModalOpen(false)} confirmText="Submit Vote" />
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">Cast Your Vote</h2>
+                {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-md mb-4">{error}</div>}
+                <div className="space-y-8">
+                    {categories.map(category => {
+                        const categoryContestants = contestants.filter(c => c.categoryId === category.id);
+                        return (
+                            <div key={category.id} className="bg-gray-800 p-6 rounded-lg shadow-xl">
+                                <h3 className="text-xl font-bold text-cyan-400 mb-4">{category.title}</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {categoryContestants.map(contestant => (
+                                        <div key={contestant.id} onClick={() => handleSelectContestant(category.id, contestant.id)} className={`p-4 rounded-lg cursor-pointer transition-all duration-200 ${selections[category.id] === contestant.id ? 'ring-4 ring-cyan-500 bg-gray-600' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                                            <div className="flex items-center gap-4">
+                                                <UserAvatar name={contestant.name} avatarUrl={contestant.avatarUrl} className="w-16 h-16 rounded-full flex-shrink-0" />
+                                                <div>
+                                                    <p className="font-bold text-lg">{contestant.name}</p>
+                                                    <p className="text-sm text-gray-400">{contestant.class}</p>
+                                                    <p className="text-sm font-bold text-cyan-300 mt-1">{contestant.votes} Votes</p>
+                                                </div>
+                                            </div>
+                                            <details className="mt-3">
+                                                <summary className="text-xs text-gray-400 cursor-pointer hover:text-white">View Manifesto</summary>
+                                                <p className="text-sm text-gray-300 mt-2 whitespace-pre-wrap">{contestant.manifesto}</p>
+                                            </details>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="mt-8 text-center">
+                    <button onClick={handleSubmitVote} disabled={Object.keys(selections).length !== categories.length} className="px-8 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-lg disabled:bg-gray-600 disabled:cursor-not-allowed">
+                        Submit My Vote
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="text-center p-8 bg-gray-800 rounded-lg">
+            <h3 className="text-2xl font-bold text-yellow-400">Voting is Currently Closed</h3>
+            <p className="text-gray-300 mt-2">Please check back when the voting period is open.</p>
+            {settings.startTime > now && <p className="text-sm mt-4">Voting starts on: {new Date(settings.startTime).toLocaleString()}</p>}
         </div>
     );
 };
