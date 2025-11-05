@@ -1,10 +1,26 @@
-// components/VisitorRegPage.tsx
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { School, AdminUser, ExtractedIdData, VisitorLog } from '../types';
-import * as visitorService from '../services/visitorService';
 import * as apiService from '../services/apiService';
+import * as visitorService from '../services/visitorService';
+import ConfirmationModal from './ConfirmationModal';
 import UserAvatar from './UserAvatar';
+
+declare var QRCode: any;
+
+const fileToBase64 = (file: File): Promise<{ data: string, mime: string }> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            resolve({
+                data: result.split(',')[1],
+                mime: result.match(/:(.*?);/)?.[1] || 'image/jpeg'
+            });
+        };
+        reader.onerror = error => reject(error);
+    });
+};
 
 interface VisitorRegPageProps {
     school: School;
@@ -12,291 +28,213 @@ interface VisitorRegPageProps {
 }
 
 const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
-    const [activeTab, setActiveTab] = useState<'register' | 'active' | 'history'>('register');
-    
-    // State for Registration
-    const [frontIdImage, setFrontIdImage] = useState<string | null>(null);
-    const [backIdImage, setBackIdImage] = useState<string | null>(null);
-    const [extractedData, setExtractedData] = useState<ExtractedIdData | null>(null);
+    const [activeTab, setActiveTab] = useState<'check_in_out' | 'logs'>('check_in_out');
+    const [logs, setLogs] = useState<VisitorLog[]>([]);
+
+    // Check-in State
+    const [idFront, setIdFront] = useState<{ preview: string; base64: string } | null>(null);
+    const [idBack, setIdBack] = useState<{ preview: string; base64: string } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
-    const [reason, setReason] = useState('');
+    const [extractedData, setExtractedData] = useState<ExtractedIdData | null>(null);
+    const [reasonForVisit, setReasonForVisit] = useState('');
     const [personToSee, setPersonToSee] = useState('');
-    const [newVisitorCard, setNewVisitorCard] = useState<string | null>(null);
-    const [isCameraOpen, setIsCameraOpen] = useState<'front' | 'back' | null>(null);
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [generatedPass, setGeneratedPass] = useState<VisitorLog | null>(null);
 
-    // State for Active/History
-    const [activeVisitors, setActiveVisitors] = useState<VisitorLog[]>([]);
-    const [visitorHistory, setVisitorHistory] = useState<VisitorLog[]>([]);
-    const [checkoutCardNumber, setCheckoutCardNumber] = useState('');
-    const [checkoutFeedback, setCheckoutFeedback] = useState({ message: '', type: '' });
+    // Check-out State
+    const [passNumberOut, setPassNumberOut] = useState('');
+    const [checkOutFeedback, setCheckOutFeedback] = useState({ type: '', message: '' });
 
-    const refreshData = useCallback(() => {
-        setActiveVisitors(visitorService.getActiveVisitors(school.id));
-        setVisitorHistory(visitorService.getVisitorLogHistory(school.id));
+    const qrCodeRef = useRef<HTMLDivElement>(null);
+
+    const refreshLogs = useCallback(() => {
+        setLogs(visitorService.getVisitorLogsForSchool(school.id));
     }, [school.id]);
 
     useEffect(() => {
-        refreshData();
-        const interval = setInterval(refreshData, 5000); // Poll for updates
-        return () => clearInterval(interval);
-    }, [refreshData]);
+        refreshLogs();
+    }, [refreshLogs]);
 
-    const resetRegistration = () => {
-        setFrontIdImage(null);
-        setBackIdImage(null);
-        setExtractedData(null);
-        setIsLoading(false);
-        setError('');
-        setReason('');
-        setPersonToSee('');
-        setNewVisitorCard(null);
-    };
-    
-    // Camera Logic
-    useEffect(() => {
-        let stream: MediaStream | null = null;
-        if (isCameraOpen && videoRef.current) {
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-                .then(s => {
-                    stream = s;
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                    }
-                })
-                .catch(err => {
-                    setError("Could not access camera. Please grant permission.");
-                    setIsCameraOpen(null);
-                });
-        }
-        return () => stream?.getTracks().forEach(track => track.stop());
-    }, [isCameraOpen]);
-    
-    const captureImage = () => {
-        if (videoRef.current) {
-            const canvas = document.createElement('canvas');
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg');
-            
-            if (isCameraOpen === 'front') setFrontIdImage(dataUrl);
-            if (isCameraOpen === 'back') setBackIdImage(dataUrl);
-
-            setIsCameraOpen(null);
-        }
-    };
-    
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const dataUrl = event.target?.result as string;
-                if (side === 'front') setFrontIdImage(dataUrl);
-                else setBackIdImage(dataUrl);
-            };
-            reader.readAsDataURL(file);
+            const preview = URL.createObjectURL(file);
+            const { data } = await fileToBase64(file);
+            if (side === 'front') setIdFront({ preview, base64: data });
+            else setIdBack({ preview, base64: data });
         }
     };
 
-    const handleExtractDetails = async () => {
-        if (!frontIdImage) {
-            setError("Please provide at least the front image of the ID card.");
+    const handleProcessIds = async () => {
+        if (!idFront) {
+            setError("Front of ID is required.");
             return;
         }
         setIsLoading(true);
         setError('');
         try {
-            const base64Image = frontIdImage.split(',')[1];
-            const mimeType = frontIdImage.match(/data:(.*);base64/)?.[1] || 'image/jpeg';
-            const data = await apiService.extractDetailsFromIdCard(base64Image, mimeType);
+            const data = await apiService.extractDetailsFromIdCard(idFront.base64, idBack?.base64);
             setExtractedData(data);
         } catch (err) {
-            setError("AI failed to extract details. Please enter them manually or try a clearer image.");
+            setError("AI could not process the ID images. Please try with clearer images.");
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleCheckIn = () => {
-        if (!extractedData?.fullName || !extractedData?.idNumber || !reason.trim() || !frontIdImage) {
-            setError("Full Name, ID Number, Reason for Visit, and a front ID image are required.");
+    const handleGeneratePass = () => {
+        if (!extractedData || !extractedData.fullName || !extractedData.idNumber || !reasonForVisit) {
+            setError("Visitor name, ID number, and reason for visit are required.");
             return;
         }
         try {
-            const visitor = visitorService.getOrCreateVisitor(extractedData, school.id);
-            const newLog = visitorService.checkInVisitor({
-                visitorId: visitor.id,
+            const newLog = visitorService.createVisitorLog({
                 schoolId: school.id,
-                reasonForVisit: reason,
-                personToSee: personToSee,
-                frontIdImage: frontIdImage,
-                backIdImage: backIdImage || '',
+                visitorIdNumber: extractedData.idNumber,
+                visitorName: extractedData.fullName,
+                reasonForVisit,
+                personToSee,
+                idFrontImage: idFront!.preview,
+                idBackImage: idBack?.preview,
+                extractedData,
             });
-            setNewVisitorCard(newLog.cardNumber);
-            refreshData(); // Update active visitors list
+            setGeneratedPass(newLog);
+            refreshLogs();
         } catch (err) {
             setError((err as Error).message);
         }
     };
+    
+    useEffect(() => {
+        if (generatedPass && qrCodeRef.current) {
+            qrCodeRef.current.innerHTML = ''; // Clear previous QR
+            new QRCode(qrCodeRef.current, {
+                text: generatedPass.passNumber,
+                width: 128,
+                height: 128,
+            });
+        }
+    }, [generatedPass]);
 
-    const handleCheckout = () => {
-        if (!checkoutCardNumber.trim()) return;
-        setCheckoutFeedback({ message: '', type: '' });
+    const handleCheckOut = () => {
+        setCheckOutFeedback({ type: '', message: '' });
+        if (!passNumberOut.trim()) return;
         try {
-            const checkedOutLog = visitorService.checkOutVisitor(checkoutCardNumber, school.id);
-            const visitor = visitorService.getVisitorById(checkedOutLog.visitorId);
-            setCheckoutFeedback({ message: `Successfully checked out ${visitor?.fullName || 'visitor'}.`, type: 'success' });
-            setCheckoutCardNumber('');
-            refreshData();
+            const checkedOutLog = visitorService.checkoutVisitor(passNumberOut, school.id);
+            setCheckOutFeedback({ type: 'success', message: `${checkedOutLog.visitorName} checked out successfully at ${new Date(checkedOutLog.exitTime!).toLocaleTimeString()}.` });
+            setPassNumberOut('');
+            refreshLogs();
         } catch (err) {
-            setCheckoutFeedback({ message: (err as Error).message, type: 'error' });
+            setCheckOutFeedback({ type: 'error', message: (err as Error).message });
         }
     };
 
-    const renderRegisterTab = () => (
-        <div className="space-y-6">
-            {newVisitorCard ? (
-                <div className="bg-green-800 p-8 rounded-lg text-center">
-                    <h3 className="text-2xl font-bold text-white">Check-in Successful!</h3>
-                    <p className="text-green-200 mt-2">Please provide the visitor with their card number.</p>
-                    <div className="my-6">
-                        <p className="text-lg text-green-200">Visitor Card Number:</p>
-                        <p className="font-mono text-5xl font-bold tracking-widest bg-gray-900 p-4 rounded-md inline-block my-2">{newVisitorCard}</p>
-                    </div>
-                    <button onClick={resetRegistration} className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 font-semibold rounded-md">Register Next Visitor</button>
-                </div>
-            ) : (
-                <>
-                    {/* Image Upload */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {['front', 'back'].map(side => {
-                            const image = side === 'front' ? frontIdImage : backIdImage;
-                            return (
-                                <div key={side} className="bg-gray-700 p-4 rounded-lg text-center">
-                                    <h4 className="font-bold mb-2 capitalize">{side} of ID</h4>
-                                    {image ? (
-                                        <img src={image} alt={`${side} of ID`} className="w-full h-40 object-contain rounded-md mb-2" />
-                                    ) : (
-                                        <div className="w-full h-40 bg-gray-600 rounded-md flex items-center justify-center text-gray-400 mb-2">Image Preview</div>
-                                    )}
-                                    <div className="flex gap-2 justify-center">
-                                        <button onClick={() => fileInputRef.current?.click()} className="text-sm px-3 py-1.5 bg-gray-600 rounded-md">Upload</button>
-                                        <input type="file" ref={fileInputRef} onChange={e => handleFileUpload(e, side as 'front' | 'back')} accept="image/*" className="hidden" />
-                                        <button onClick={() => setIsCameraOpen(side as 'front' | 'back')} className="text-sm px-3 py-1.5 bg-gray-600 rounded-md">Camera</button>
-                                    </div>
-                                    {image && <button onClick={() => side === 'front' ? setFrontIdImage(null) : setBackIdImage(null)} className="text-xs text-red-400 mt-2">Remove</button>}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Extracted Data & Form */}
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                        <button onClick={handleExtractDetails} disabled={!frontIdImage || isLoading} className="w-full mb-4 py-2 bg-cyan-600 rounded-md font-semibold disabled:bg-gray-500">
-                            {isLoading ? 'Extracting...' : 'Extract Details with AI'}
-                        </button>
-                        {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
-                        <div className="space-y-4">
-                            <input value={extractedData?.fullName || ''} onChange={e => setExtractedData(p => ({...p!, fullName: e.target.value}))} placeholder="Full Name" className="w-full p-2 bg-gray-600 rounded-md" />
-                            <input value={extractedData?.idNumber || ''} onChange={e => setExtractedData(p => ({...p!, idNumber: e.target.value}))} placeholder="ID Number" className="w-full p-2 bg-gray-600 rounded-md" />
-                            <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Reason for Visiting (Required)" required rows={3} className="w-full p-2 bg-gray-600 rounded-md" />
-                            <input value={personToSee} onChange={e => setPersonToSee(e.target.value)} placeholder="Person to See (Optional)" className="w-full p-2 bg-gray-600 rounded-md" />
-                        </div>
-                    </div>
-                    
-                    <div className="text-right">
-                        <button onClick={handleCheckIn} className="px-6 py-2 bg-green-600 hover:bg-green-700 font-semibold rounded-md">Check-In Visitor</button>
-                    </div>
-                </>
-            )}
-        </div>
-    );
-
-    const renderActiveTab = () => (
-        <div className="space-y-4">
-             <div className="bg-gray-700 p-4 rounded-lg">
-                <h4 className="font-bold mb-2">Checkout Visitor</h4>
-                {checkoutFeedback.message && <p className={`text-sm mb-2 ${checkoutFeedback.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>{checkoutFeedback.message}</p>}
-                <div className="flex gap-2">
-                    <input value={checkoutCardNumber} onChange={e => setCheckoutCardNumber(e.target.value)} placeholder="Enter Visitor Card Number" className="w-full p-2 bg-gray-600 rounded-md"/>
-                    <button onClick={handleCheckout} className="px-4 py-2 bg-red-600 rounded-md font-semibold">Checkout</button>
-                </div>
-            </div>
-            {activeVisitors.map(log => {
-                const visitor = visitorService.getVisitorById(log.visitorId);
-                return (
-                    <div key={log.id} className="bg-gray-700 p-3 rounded-lg flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <UserAvatar name={visitor?.fullName || ''} className="w-10 h-10 rounded-full" />
-                            <div>
-                                <p className="font-bold">{visitor?.fullName}</p>
-                                <p className="text-xs text-gray-400">Card: {log.cardNumber} | In since {new Date(log.entryTime).toLocaleTimeString()}</p>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
-             {activeVisitors.length === 0 && <p className="text-center text-gray-400 py-8">No active visitors.</p>}
-        </div>
-    );
-    
-    const renderHistoryTab = () => (
-        <div className="overflow-x-auto bg-gray-700 rounded-lg">
-             <table className="min-w-full text-sm">
-                <thead className="bg-gray-600"><tr>
-                    <th className="p-3 text-left">Visitor</th>
-                    <th className="p-3 text-left">Reason</th>
-                    <th className="p-3 text-left">Entry</th>
-                    <th className="p-3 text-left">Exit</th>
-                </tr></thead>
-                <tbody className="divide-y divide-gray-800">
-                    {visitorHistory.map(log => {
-                         const visitor = visitorService.getVisitorById(log.visitorId);
-                         return (
-                            <tr key={log.id}>
-                                <td className="p-3"><p className="font-semibold">{visitor?.fullName}</p><p className="text-xs text-gray-400">{visitor?.idNumber}</p></td>
-                                <td className="p-3">{log.reasonForVisit}</td>
-                                <td className="p-3">{new Date(log.entryTime).toLocaleString()}</td>
-                                <td className="p-3">{log.exitTime ? new Date(log.exitTime).toLocaleString() : 'Still Active'}</td>
-                            </tr>
-                         );
-                    })}
-                </tbody>
-             </table>
-             {visitorHistory.length === 0 && <p className="text-center text-gray-400 py-8">No visitor history.</p>}
-        </div>
-    );
+    const resetCheckIn = () => {
+        setIdFront(null);
+        setIdBack(null);
+        setExtractedData(null);
+        setReasonForVisit('');
+        setPersonToSee('');
+        setError('');
+        setGeneratedPass(null);
+    };
 
     return (
         <div className="space-y-6">
-            {isCameraOpen && (
-                 <div className="fixed inset-0 bg-black/80 flex flex-col justify-center items-center z-[110] p-4">
-                    <video ref={videoRef} autoPlay className="w-full max-w-lg rounded-lg mb-4"></video>
-                    <div className="flex gap-4">
-                        <button onClick={captureImage} className="px-6 py-2 bg-cyan-600 rounded-lg">Capture</button>
-                        <button onClick={() => setIsCameraOpen(null)} className="px-6 py-2 bg-red-600 rounded-lg">Cancel</button>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">Visitor Registration</h2>
+            <div className="flex items-center gap-2 p-1 bg-gray-800 rounded-lg">
+                <button onClick={() => setActiveTab('check_in_out')} className={`w-full py-2 text-sm font-semibold rounded-md ${activeTab === 'check_in_out' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>Check-in / Check-out</button>
+                <button onClick={() => setActiveTab('logs')} className={`w-full py-2 text-sm font-semibold rounded-md ${activeTab === 'logs' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>Visitor Logs</button>
+            </div>
+
+            {activeTab === 'check_in_out' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Check-in */}
+                    <div className="bg-gray-800 p-6 rounded-lg space-y-4">
+                        <h3 className="text-xl font-bold">New Visitor Check-in</h3>
+                        {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-md text-sm">{error}</div>}
+                        
+                        {!extractedData && !generatedPass && (
+                            <>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {['front', 'back'].map(side => (
+                                        <div key={side}>
+                                            <label className="text-sm font-semibold block mb-2 capitalize">ID {side}</label>
+                                            <label className="cursor-pointer flex flex-col items-center justify-center p-4 bg-gray-700 hover:bg-gray-600 rounded-lg border-2 border-dashed border-gray-500 h-32">
+                                                {(side === 'front' ? idFront : idBack) ? (
+                                                    <img src={(side === 'front' ? idFront : idBack)?.preview} alt={`ID ${side}`} className="max-h-full max-w-full object-contain" />
+                                                ) : (
+                                                    <span className="text-gray-400 text-xs">Click to upload or capture</span>
+                                                )}
+                                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFileSelect(e, side as 'front' | 'back')} />
+                                            </label>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={handleProcessIds} disabled={isLoading || !idFront} className="w-full py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold disabled:bg-gray-500">
+                                    {isLoading ? 'Processing with AI...' : 'Process ID(s)'}
+                                </button>
+                            </>
+                        )}
+
+                        {extractedData && !generatedPass && (
+                            <div className="space-y-3 animate-fade-in-up">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div><label className="text-xs text-gray-400">Full Name</label><p>{extractedData.fullName || 'N/A'}</p></div>
+                                    <div><label className="text-xs text-gray-400">ID Number</label><p>{extractedData.idNumber || 'N/A'}</p></div>
+                                    <div><label className="text-xs text-gray-400">ID Type</label><p>{extractedData.idType || 'N/A'}</p></div>
+                                    <div><label className="text-xs text-gray-400">Date of Birth</label><p>{extractedData.dateOfBirth || 'N/A'}</p></div>
+                                </div>
+                                <div><label className="text-xs text-gray-400">Reason for Visit</label><input value={reasonForVisit} onChange={e => setReasonForVisit(e.target.value)} required className="w-full p-2 bg-gray-700 rounded mt-1" /></div>
+                                <div><label className="text-xs text-gray-400">Person to See (Optional)</label><input value={personToSee} onChange={e => setPersonToSee(e.target.value)} className="w-full p-2 bg-gray-700 rounded mt-1" /></div>
+                                <div className="flex gap-2"><button onClick={resetCheckIn} className="w-full py-2 bg-gray-600 rounded-md">Back</button><button onClick={handleGeneratePass} className="w-full py-2 bg-green-600 rounded-md">Generate Pass</button></div>
+                            </div>
+                        )}
+
+                        {generatedPass && (
+                            <div className="text-center space-y-4 animate-fade-in-up">
+                                <h4 className="font-bold text-green-400">Pass Generated!</h4>
+                                <p>Please present this pass number upon exit.</p>
+                                <div className="bg-white p-4 rounded-lg inline-block" ref={qrCodeRef}></div>
+                                <p className="font-mono text-2xl tracking-widest">{generatedPass.passNumber}</p>
+                                <button onClick={resetCheckIn} className="w-full py-2 bg-cyan-600 rounded-md">Register Next Visitor</button>
+                            </div>
+                        )}
+                    </div>
+                    {/* Check-out */}
+                    <div className="bg-gray-800 p-6 rounded-lg space-y-4 h-fit">
+                        <h3 className="text-xl font-bold">Visitor Check-out</h3>
+                        {checkOutFeedback.message && <div className={`p-3 rounded-md text-sm ${checkOutFeedback.type === 'success' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>{checkOutFeedback.message}</div>}
+                        <div className="flex items-center gap-2">
+                             <input value={passNumberOut} onChange={e => setPassNumberOut(e.target.value)} placeholder="Enter or Scan Pass Number" className="w-full p-2 bg-gray-700 rounded-md" />
+                             <button onClick={handleCheckOut} className="px-4 py-2 bg-cyan-600 rounded-md">Check Out</button>
+                        </div>
                     </div>
                 </div>
             )}
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl sm:text-3xl font-bold text-white">Visitor Registration</h2>
-            </div>
-            <div className="flex items-center gap-2 p-1 bg-gray-800 rounded-lg">
-                <button onClick={() => setActiveTab('register')} className={`w-full py-2 text-sm font-semibold rounded-md ${activeTab === 'register' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>Register</button>
-                <button onClick={() => setActiveTab('active')} className={`w-full py-2 text-sm font-semibold rounded-md relative ${activeTab === 'active' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>
-                    Active Visitors
-                    {activeVisitors.length > 0 && <span className="absolute top-1 right-2 w-5 h-5 bg-cyan-800 text-xs rounded-full flex items-center justify-center">{activeVisitors.length}</span>}
-                </button>
-                <button onClick={() => setActiveTab('history')} className={`w-full py-2 text-sm font-semibold rounded-md ${activeTab === 'history' ? 'bg-cyan-600' : 'hover:bg-gray-600'}`}>History</button>
-            </div>
             
-            {activeTab === 'register' && renderRegisterTab()}
-            {activeTab === 'active' && renderActiveTab()}
-            {activeTab === 'history' && renderHistoryTab()}
+            {activeTab === 'logs' && (
+                <div className="bg-gray-800 p-6 rounded-lg">
+                    <h3 className="text-xl font-bold mb-4">Visitor Log</h3>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-700/50"><tr><th className="p-2 text-left">Visitor</th><th className="p-2 text-left">Reason</th><th className="p-2 text-left">Entry Time</th><th className="p-2 text-left">Exit Time</th><th className="p-2 text-left">Status</th></tr></thead>
+                            <tbody className="divide-y divide-gray-700">
+                                {logs.map(log => (
+                                    <tr key={log.id} className="hover:bg-gray-700/50">
+                                        <td className="p-2">{log.visitorName} ({log.visitorIdNumber})</td>
+                                        <td className="p-2">{log.reasonForVisit}</td>
+                                        <td className="p-2">{new Date(log.entryTime).toLocaleString()}</td>
+                                        <td className="p-2">{log.exitTime ? new Date(log.exitTime).toLocaleString() : 'N/A'}</td>
+                                        <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${log.status === 'checked_in' ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-400'}`}>{log.status.replace('_', ' ')}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {logs.length === 0 && <p className="text-center py-8 text-gray-400">No visitor logs found.</p>}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

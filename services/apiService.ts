@@ -1,6 +1,5 @@
 // This service handles all external AI API communications.
 import { GoogleGenAI, Type } from "@google/genai";
-// FIX: Import ExtractedIdData to support the new ID card extraction function.
 import { Place, ExtractedIdData } from '../types';
 
 // --- Client Instances ---
@@ -268,67 +267,6 @@ export const decodeBarcodeWithGoogle = async (base64Image: string, mimeType: str
              console.error("Error decoding barcode with Google GenAI:", error);
         }
         // Re-throw to be handled by the caller, which can decide whether to show an error or just retry.
-        throw error;
-    }
-};
-
-// FIX: Add missing 'extractDetailsFromIdCard' function.
-/**
- * Extracts structured text from an image of a national ID card.
- * @param base64Image The Base64 encoded image data.
- * @param mimeType The MIME type of the image.
- * @returns A promise that resolves to a structured object with the extracted data.
- */
-export const extractDetailsFromIdCard = async (base64Image: string, mimeType: string): Promise<ExtractedIdData> => {
-    try {
-        const imagePart = {
-            inlineData: {
-                mimeType,
-                data: base64Image,
-            },
-        };
-
-        const textPart = {
-            text: `
-                Analyze the provided image of a national identification card. It could be from any country, but is likely a Ugandan National ID.
-                Extract the following information precisely as it appears on the card:
-                1.  fullName: The person's full name (usually "Surname" and "Given Names").
-                2.  idNumber: The National Identification Number (NIN).
-                3.  dateOfBirth: The person's date of birth.
-                4.  expiryDate: The card's expiry date.
-                5.  nationality: The person's nationality (if present).
-
-                Return this information ONLY as a JSON object. Do not include any extra text, markdown, or explanations.
-                If a field is not present on the card, omit it or set it to null.
-            `,
-        };
-        
-        const response = await genAIClient.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [imagePart, textPart] },
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        fullName: { type: Type.STRING },
-                        idNumber: { type: Type.STRING },
-                        dateOfBirth: { type: Type.STRING, nullable: true },
-                        expiryDate: { type: Type.STRING, nullable: true },
-                        nationality: { type: Type.STRING, nullable: true },
-                    },
-                     required: [
-                        'fullName',
-                        'idNumber',
-                    ]
-                },
-            },
-        });
-
-        const jsonText = response.text.trim();
-        return JSON.parse(jsonText);
-    } catch (error) {
-        console.error("Error extracting text from ID card with Google GenAI:", error);
         throw error;
     }
 };
@@ -617,5 +555,75 @@ export const isAffirmative = async (text: string): Promise<boolean> => {
         // In case of error, it's safer to assume a non-affirmative response
         // to prevent unintended actions.
         return false;
+    }
+};
+
+/**
+ * Extracts structured details from an ID card image using Google GenAI.
+ * @param frontImageBase64 The Base64 encoded front image data.
+ * @param backImageBase64 Optional Base64 encoded back image data.
+ * @returns A promise that resolves to a structured object with the extracted data.
+ */
+export const extractDetailsFromIdCard = async (frontImageBase64: string, backImageBase64?: string): Promise<ExtractedIdData> => {
+    try {
+        const parts: any[] = [
+            {
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: frontImageBase64,
+                },
+            },
+        ];
+
+        if (backImageBase64) {
+            parts.push({
+                inlineData: {
+                    mimeType: 'image/jpeg',
+                    data: backImageBase64,
+                },
+            });
+        }
+        
+        const textPrompt = `
+            Analyze the provided image(s) of a personal identification card (e.g., National ID, Driver's License, Passport).
+            You may be given one or two images representing the front and back of the card.
+            Extract the following information:
+            1.  fullName: The full name of the person.
+            2.  idNumber: The main identification number.
+            3.  idType: The type of document (e.g., "National ID Card", "Driver's Licence").
+            4.  dateOfBirth: The person's date of birth.
+            5.  dateOfExpiry: The card's expiry date, if present.
+            6.  nationality: The person's nationality, if present.
+
+            Return this information ONLY as a JSON object. If a field is not present, return null for that key. Do not include any extra text, markdown, or explanations.
+        `;
+
+        parts.push({ text: textPrompt });
+        
+        const response = await genAIClient.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: { parts: parts },
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        fullName: { type: Type.STRING, nullable: true },
+                        idNumber: { type: Type.STRING, nullable: true },
+                        idType: { type: Type.STRING, nullable: true },
+                        dateOfBirth: { type: Type.STRING, nullable: true },
+                        dateOfExpiry: { type: Type.STRING, nullable: true },
+                        nationality: { type: Type.STRING, nullable: true },
+                    },
+                     required: ['fullName', 'idNumber', 'idType', 'dateOfBirth', 'dateOfExpiry', 'nationality']
+                },
+            },
+        });
+
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+    } catch (error) {
+        console.error("Error extracting details from ID card with Google GenAI:", error);
+        throw error;
     }
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, AdminUser, PostComment, ChatConversation, ChatMessage, ChatAttachment, Event, Place, MarketplaceListing, MarketplaceMedia, Story, GroupPost, School } from '../types';
 import ProfilePage from './ProfilePage';
@@ -79,9 +80,9 @@ const IconLike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-
 const IconDislike = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.085a2 2 0 001.736-.93l2.5-4m-7 2v-5m0 0V5m0 5h5" /></svg>;
 const IconComment = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>;
 const IconCopyLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>;
-const IconEye = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
+const IconEye = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>;
 const IconLink = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>;
-
+const IconMic = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z"></path></svg>;
 
 const PostComposer: React.FC<{ user: User | AdminUser; onPost: (htmlContent: string) => void }> = ({ user, onPost }) => {
     const [title, setTitle] = useState('');
@@ -982,7 +983,7 @@ const MarketplaceView: React.FC<{ user: User | AdminUser; setViewingListing: (li
                     <span className="hidden sm:inline whitespace-nowrap">Create Listing</span>
                 </button>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-2">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4">
                 <button onClick={() => setCategoryFilter('All')} className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap ${categoryFilter === 'All' ? 'bg-cyan-600' : 'bg-gray-700 hover:bg-gray-600'}`}>All</button>
                 {categories.map(cat => <button key={cat} onClick={() => setCategoryFilter(cat)} className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap ${categoryFilter === cat ? 'bg-cyan-600' : 'bg-gray-700 hover:bg-gray-600'}`}>{cat}</button>)}
             </div>
@@ -1047,12 +1048,357 @@ const MapPreviewModal: React.FC<{ url: string; onClose: () => void; }> = ({ url,
     );
 };
 
-const AddStoryModal: React.FC<{ user: User | AdminUser; onClose: () => void; onStoryPosted: () => void; }> = ({ onClose }) => {
-    return <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[110] p-4"><div className="bg-gray-800 rounded-lg p-4"><p>Add Story modal coming soon.</p><button onClick={onClose}>Close</button></div></div>;
+const AddStoryModal: React.FC<{ user: User | AdminUser; onClose: () => void; onStoryPosted: () => void; }> = ({ user, onClose, onStoryPosted }) => {
+    type StoryType = 'text' | 'media' | 'audio';
+    const [storyType, setStoryType] = useState<StoryType>('media');
+    const [caption, setCaption] = useState('');
+    const [mediaFile, setMediaFile] = useState<File | null>(null);
+    const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+    const [textContent, setTextContent] = useState('');
+    const [isRecording, setIsRecording] = useState(false);
+    const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+    const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const [isPosting, setIsPosting] = useState(false);
+
+    const currentUserId = 'studentId' in user ? user.studentId : user.id;
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setMediaFile(file);
+            setMediaPreview(URL.createObjectURL(file));
+        }
+    };
+
+    const handleRecord = async () => {
+        if (isRecording) {
+            mediaRecorderRef.current?.stop();
+            setIsRecording(false);
+        } else {
+            setAudioBlob(null);
+            setAudioUrl(null);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            const audioChunks: Blob[] = [];
+            mediaRecorderRef.current.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorderRef.current.onstop = () => {
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                setAudioBlob(blob);
+                setAudioUrl(URL.createObjectURL(blob));
+                stream.getTracks().forEach(track => track.stop());
+            };
+            mediaRecorderRef.current.start();
+            setIsRecording(true);
+        }
+    };
+
+    const handlePost = async () => {
+        setIsPosting(true);
+        try {
+            let storyData: any = { userId: currentUserId, content: caption };
+
+            if (storyType === 'text') {
+                storyData = { ...storyData, content: textContent };
+            } else if (storyType === 'media' && mediaFile) {
+                const mediaUrl = await fileToBase64(mediaFile);
+                storyData = { ...storyData, mediaUrl, mediaType: mediaFile.type.startsWith('video') ? 'video' : 'image' };
+            } else if (storyType === 'audio' && audioBlob) {
+                const mediaUrl = await fileToBase64(audioBlob);
+                storyData = { ...storyData, mediaUrl, mediaType: 'audio' };
+            }
+            
+            groupService.addStory(storyData);
+            onStoryPosted();
+            onClose();
+        } catch (error) {
+            console.error("Failed to post story:", error);
+            alert("Could not post story. Please try again.");
+        } finally {
+            setIsPosting(false);
+        }
+    };
+    
+    const canPost = isPosting === false && (
+        (storyType === 'text' && textContent.trim()) ||
+        (storyType === 'media' && mediaFile) ||
+        (storyType === 'audio' && audioBlob)
+    );
+
+    return (
+        <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-[110] p-4">
+            <div className="bg-gray-800 rounded-lg w-full max-w-lg flex flex-col">
+                <div className="p-4 border-b border-gray-700 flex justify-between items-center">
+                    <h3 className="text-xl font-bold">Create Story</h3>
+                    <button onClick={onClose} className="text-2xl">&times;</button>
+                </div>
+                <div className="flex border-b border-gray-700">
+                    <button onClick={() => setStoryType('media')} className={`w-full p-3 text-sm font-semibold ${storyType === 'media' ? 'bg-gray-700' : 'hover:bg-gray-700/50'}`}>Photo/Video</button>
+                    <button onClick={() => setStoryType('text')} className={`w-full p-3 text-sm font-semibold ${storyType === 'text' ? 'bg-gray-700' : 'hover:bg-gray-700/50'}`}>Text</button>
+                    <button onClick={() => setStoryType('audio')} className={`w-full p-3 text-sm font-semibold ${storyType === 'audio' ? 'bg-gray-700' : 'hover:bg-gray-700/50'}`}>Audio</button>
+                </div>
+                <div className="p-4 space-y-4">
+                    {storyType === 'text' && (
+                        <textarea value={textContent} onChange={e => setTextContent(e.target.value)} placeholder="Start typing..." rows={6} className="w-full p-3 bg-gray-700 rounded-md"/>
+                    )}
+                    {storyType === 'media' && (
+                        <div className="space-y-3">
+                            <input type="file" accept="image/*,video/*" onChange={handleFileChange} className="w-full text-sm"/>
+                            {mediaPreview && (
+                                <div className="max-h-60 flex justify-center bg-gray-900 rounded-md">
+                                    {mediaFile?.type.startsWith('video') ? <video src={mediaPreview} controls className="max-h-60"/> : <img src={mediaPreview} className="max-h-60 object-contain"/>}
+                                </div>
+                            )}
+                            <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Add a caption... (optional)" className="w-full p-2 bg-gray-700 rounded-md text-sm"/>
+                        </div>
+                    )}
+                     {storyType === 'audio' && (
+                        <div className="space-y-3 text-center">
+                            <button onClick={handleRecord} className={`px-5 py-2 rounded-md font-semibold ${isRecording ? 'bg-red-600' : 'bg-cyan-600'}`}>{isRecording ? 'Stop Recording' : 'Start Recording'}</button>
+                            {isRecording && <p className="text-sm text-red-400 animate-pulse">Recording...</p>}
+                            {audioUrl && <audio src={audioUrl} controls className="w-full mt-2"/>}
+                            <input value={caption} onChange={e => setCaption(e.target.value)} placeholder="Add a caption... (optional)" className="w-full p-2 bg-gray-700 rounded-md text-sm"/>
+                        </div>
+                    )}
+                </div>
+                 <div className="p-4 border-t border-gray-700">
+                    <button onClick={handlePost} disabled={!canPost} className="w-full py-2 bg-cyan-600 rounded-md font-semibold disabled:bg-gray-600">{isPosting ? 'Posting...' : 'Post Story'}</button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
-const StoryViewer: React.FC<{ onClose: () => void; }> = ({ onClose }) => {
-    return <div className="fixed inset-0 bg-black/90 flex justify-center items-center z-[110] p-4"><div className="bg-gray-800 rounded-lg p-4"><p>Story Viewer coming soon.</p><button onClick={onClose}>Close</button></div></div>;
+const StoryViewer: React.FC<{
+    storiesByUser: Record<string, Story[]>;
+    startUser: User | AdminUser;
+    currentUser: User | AdminUser;
+    onClose: () => void;
+}> = ({ storiesByUser, startUser, currentUser, onClose }) => {
+    const usersWithStories = useMemo(() => Object.keys(storiesByUser).map(id => findFullUserById(id)).filter((u): u is User | AdminUser => !!u), [storiesByUser]);
+    const startUserIndex = usersWithStories.findIndex(u => ('studentId' in u ? u.studentId : u.id) === ('studentId' in startUser ? startUser.studentId : startUser.id));
+
+    const [currentUserIndex, setCurrentUserIndex] = useState(startUserIndex >= 0 ? startUserIndex : 0);
+    const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+    const [isPaused, setIsPaused] = useState(false);
+    const [isCommenting, setIsCommenting] = useState(false);
+    const [commentText, setCommentText] = useState('');
+    const [commentSent, setCommentSent] = useState(false);
+
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const progressAnimationRef = useRef<HTMLDivElement>(null);
+
+    const currentUserId = ('studentId' in currentUser) ? currentUser.studentId : currentUser.id;
+    const activeUser = usersWithStories[currentUserIndex];
+    const activeStories = activeUser ? storiesByUser['studentId' in activeUser ? activeUser.studentId : activeUser.id] : [];
+    const activeStory = activeStories?.[currentStoryIndex];
+
+    const goToNextStory = useCallback(() => {
+        if (currentStoryIndex < activeStories.length - 1) {
+            setCurrentStoryIndex(prev => prev + 1);
+        } else {
+            if (currentUserIndex < usersWithStories.length - 1) {
+                setCurrentUserIndex(prev => prev + 1);
+                setCurrentStoryIndex(0);
+            } else {
+                onClose();
+            }
+        }
+    }, [currentStoryIndex, activeStories.length, currentUserIndex, usersWithStories.length, onClose]);
+    
+    useEffect(() => {
+        if (!activeStory || isPaused) return;
+        
+        groupService.markStoryAsViewed(activeStory.id, currentUserId);
+    
+        if (activeStory.mediaType === 'image' || !activeStory.mediaType || activeStory.mediaType === 'text') {
+            const timer = setTimeout(goToNextStory, 7000);
+            return () => clearTimeout(timer);
+        }
+    }, [activeStory, goToNextStory, currentUserId, isPaused]);
+
+     useEffect(() => {
+        const video = videoRef.current;
+        const audio = audioRef.current;
+        if (isPaused) {
+            video?.pause();
+            audio?.pause();
+        } else {
+            video?.play().catch(console.error);
+            audio?.play().catch(console.error);
+        }
+    }, [isPaused, activeStory]);
+
+    const goToPrevStory = () => {
+        if (currentStoryIndex > 0) {
+            setCurrentStoryIndex(prev => prev - 1);
+        } else {
+            if (currentUserIndex > 0) {
+                const prevUserIndex = currentUserIndex - 1;
+                const prevUser = usersWithStories[prevUserIndex];
+                const prevUserStories = storiesByUser['studentId' in prevUser ? prevUser.studentId : prevUser.id];
+                setCurrentUserIndex(prevUserIndex);
+                setCurrentStoryIndex(prevUserStories.length - 1);
+            }
+        }
+    };
+    
+    const handleReaction = (emoji: string) => {
+        if (activeStory) {
+            groupService.toggleStoryReaction(activeStory.id, currentUserId, emoji);
+        }
+    };
+
+     const handleSendComment = () => {
+        if (!commentText.trim() || !activeUser) return;
+        const targetUserId = 'studentId' in activeUser ? activeUser.studentId : activeUser.id;
+
+        const conversation = chatService.startOrGetConversation(currentUserId, targetUserId);
+        chatService.sendMessage(
+            conversation.id,
+            currentUserId,
+            `Replied to your story: ${commentText.trim()}`
+        );
+        
+        setCommentText('');
+        setIsCommenting(false);
+        setCommentSent(true);
+        setTimeout(() => setCommentSent(false), 2000);
+    };
+
+    if (!activeUser || !activeStory) {
+        onClose();
+        return null;
+    }
+    
+    const availableReactions = ['❤️', '😂', '😮', '😢', '👍'];
+    const storyDuration = (activeStory.mediaType === 'image' || !activeStory.mediaType || activeStory.mediaType === 'text') ? '7s' : '0s';
+
+    const handleViewerClick = () => {
+        if (isCommenting) {
+            setIsCommenting(false);
+        } else {
+            setIsPaused(p => !p);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/90 z-[110] flex items-center justify-center" onClick={onClose}>
+            {commentSent && (
+                <div className="absolute top-20 bg-black/70 px-4 py-2 rounded-full text-sm z-50">Message Sent</div>
+            )}
+            <div className="relative w-full max-w-sm h-[90vh] bg-gray-900 rounded-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div className="absolute top-2 left-2 right-2 flex gap-1 z-20">
+                    {activeStories.map((_, index) => (
+                        <div key={index} className="flex-1 h-1 bg-white/30 rounded-full">
+                            <div
+                                key={activeStory.id + index}
+                                ref={progressAnimationRef}
+                                className={`h-full bg-white rounded-full ${index < currentStoryIndex ? 'w-full' : (index === currentStoryIndex ? 'animate-progress' : 'w-0')}`}
+                                style={{
+                                    animationDuration: storyDuration,
+                                    animationPlayState: isPaused ? 'paused' : 'running',
+                                }}
+                            ></div>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="absolute top-5 left-4 z-20 flex items-center gap-2">
+                    <UserAvatar name={activeUser.name} avatarUrl={activeUser.avatarUrl} className="w-10 h-10 rounded-full"/>
+                    <div>
+                        <p className="font-bold text-sm">{activeUser.name}</p>
+                        <p className="text-xs text-gray-300">{timeSince(activeStory.timestamp)}</p>
+                    </div>
+                </div>
+
+                <button onClick={onClose} className="absolute top-4 right-4 text-2xl z-20">&times;</button>
+                
+                <div className="absolute h-full w-1/3 left-0 z-10" onClick={e => {e.stopPropagation(); goToPrevStory(); }}></div>
+                <div className="absolute h-full w-1/3 right-0 z-10" onClick={e => {e.stopPropagation(); goToNextStory(); }}></div>
+                
+                <div className="w-full h-full flex items-center justify-center relative" onClick={handleViewerClick}>
+                    {activeStory.mediaType === 'image' && <img key={activeStory.id} src={activeStory.mediaUrl} className="max-w-full max-h-full object-contain"/>}
+                    {activeStory.mediaType === 'video' && <video key={activeStory.id} ref={videoRef} src={activeStory.mediaUrl} className="max-w-full max-h-full" autoPlay onEnded={goToNextStory} playsInline/>}
+                    {activeStory.mediaType === 'audio' && (
+                        <div key={activeStory.id} className="p-4 text-center">
+                            <IconMic />
+                            <audio ref={audioRef} src={activeStory.mediaUrl} autoPlay onEnded={goToNextStory} />
+                            {activeStory.content && <p className="mt-4 text-lg">{activeStory.content}</p>}
+                        </div>
+                    )}
+                    {(!activeStory.mediaType || activeStory.mediaType === 'text') && activeStory.content && (
+                        <div key={activeStory.id} className="p-8 text-center text-2xl font-semibold flex items-center justify-center h-full">
+                            <p>{activeStory.content}</p>
+                        </div>
+                    )}
+                    {isPaused && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+                            <svg className="w-16 h-16 text-white/80" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" /></svg>
+                        </div>
+                    )}
+                </div>
+                
+                {(activeStory.mediaType && activeStory.content) && (
+                     <div className="absolute bottom-24 left-0 right-0 p-4 bg-black/50 text-center text-sm">
+                        {activeStory.content}
+                    </div>
+                )}
+                
+                <div className="absolute bottom-16 left-4 right-4 z-20 flex justify-between items-center">
+                    <div className="flex items-center gap-1 bg-black/50 rounded-full px-2 py-1">
+                        <IconEye />
+                        <span className="text-xs font-semibold">{activeStory.viewedBy?.length || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        {/* FIX: Add Array.isArray check to prevent runtime errors from potentially malformed data in localStorage. */}
+                        {Object.entries(activeStory.reactions).filter(([, userIds]) => Array.isArray(userIds) && userIds.length > 0).map(([emoji, userIds]) => (
+                            <div key={emoji} className="flex items-center bg-black/50 rounded-full px-2 py-1">
+                                <span className="text-sm">{emoji}</span>
+                                {/* FIX: Add type assertion to ensure userIds is treated as an array for the .length property. */}
+                                <span className="text-xs font-semibold ml-1">{(userIds as string[]).length}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="absolute bottom-4 left-4 right-4 z-20">
+                    {isCommenting ? (
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="text"
+                                value={commentText}
+                                onChange={e => setCommentText(e.target.value)}
+                                placeholder="Send a message..."
+                                className="w-full px-4 py-2 bg-black/50 border border-gray-600 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                                autoFocus
+                                onClick={e => e.stopPropagation()}
+                                onKeyDown={e => { if(e.key === 'Enter') handleSendComment(); }}
+                            />
+                            <button onClick={e => {e.stopPropagation(); handleSendComment();}} disabled={!commentText.trim()} className="p-2 bg-cyan-600 rounded-full disabled:bg-gray-500"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M3.105 3.106a.75.75 0 01.884-.043l11.25 6.25a.75.75 0 010 1.372l-11.25 6.25a.75.75 0 01-1.043-.999l2.57-6.25-2.57-6.25a.75.75 0 01.159-1.03z" /></svg></button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                {availableReactions.map(emoji => {
+                                    const hasReacted = activeStory.reactions?.[emoji]?.includes(currentUserId);
+                                    return (
+                                        <button key={emoji} onClick={e => {e.stopPropagation(); handleReaction(emoji);}} className={`text-2xl transition-transform transform hover:scale-125 ${hasReacted ? 'scale-110' : ''}`}>
+                                            {emoji}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                             <button onClick={e => {e.stopPropagation(); setIsCommenting(true);}} className="p-2 rounded-full bg-black/30 hover:bg-black/50">
+                                <IconComment/>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
 
 
@@ -1309,8 +1655,20 @@ const ListingDetailModal: React.FC<{
     const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
     const [copiedLink, setCopiedLink] = useState<string | null>(null);
 
-    const nextMedia = () => setCurrentMediaIndex((prev) => (prev + 1) % listing.media.length);
-    const prevMedia = () => setCurrentMediaIndex((prev) => (prev - 1 + listing.media.length) % listing.media.length);
+    const media = (Array.isArray(listing.media) ? listing.media : []);
+
+    const nextMedia = () => {
+        const mediaArray = (Array.isArray(media) ? media : []) as MarketplaceMedia[];
+        if (mediaArray.length > 0) {
+            setCurrentMediaIndex((prev) => (prev + 1) % mediaArray.length);
+        }
+    };
+    const prevMedia = () => {
+        const mediaArray = (Array.isArray(media) ? media : []) as MarketplaceMedia[];
+        if (mediaArray.length > 0) {
+            setCurrentMediaIndex((prev) => (prev - 1 + mediaArray.length) % mediaArray.length);
+        }
+    };
 
     const handleMessageSeller = () => {
         onStartMessage(listing.sellerId);
@@ -1345,15 +1703,15 @@ const ListingDetailModal: React.FC<{
         <div className="fixed inset-0 bg-black/80 flex justify-center items-center z-[110] p-4 animate-fade-in-up" onClick={onClose}>
             <div className="bg-gray-800 rounded-lg w-full max-w-4xl h-[90vh] flex flex-col md:flex-row overflow-hidden" onClick={e => e.stopPropagation()}>
                 <div className="w-full md:w-3/5 h-64 md:h-full bg-gray-900 relative flex items-center justify-center">
-                    {listing.media.length > 0 ? (
+                    {media.length > 0 ? (
                         <>
-                            {listing.media[currentMediaIndex].type === 'image' ? (
-                                <img src={listing.media[currentMediaIndex].url} alt={listing.title} className="max-w-full max-h-full object-contain" />
+                            {media[currentMediaIndex].type === 'image' ? (
+                                <img src={media[currentMediaIndex].url} alt={listing.title} className="max-w-full max-h-full object-contain" />
                             ) : (
-                                <video src={listing.media[currentMediaIndex].url} className="max-w-full max-h-full" controls autoPlay loop />
+                                <video src={media[currentMediaIndex].url} className="max-w-full max-h-full" controls autoPlay loop />
                             )}
 
-                            {listing.media.length > 1 && (
+                            {media.length > 1 && (
                                 <>
                                     <button onClick={prevMedia} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/80">&lt;</button>
                                     <button onClick={nextMedia} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-black/50 rounded-full hover:bg-black/80">&gt;</button>
@@ -1427,8 +1785,8 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
     const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
     
     const [storiesByUser, setStoriesByUser] = useState<Record<string, Story[]>>({});
-    const [viewingStoriesOfUser, setViewingStoriesOfUser] = useState<User | AdminUser | null>(null);
     const [isAddStoryModalOpen, setIsAddStoryModalOpen] = useState(false);
+    const [viewingStoriesOfUser, setViewingStoriesOfUser] = useState<User | AdminUser | null>(null);
 
     const [feedPosts, setFeedPosts] = useState<GroupPost[]>([]);
     
@@ -1759,9 +2117,9 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
                                     <div className="px-4 py-2 flex justify-between items-center text-sm text-gray-400 border-b border-gray-700">
                                         <div className="flex items-center gap-1">
                                             {post.reactions && Object.keys(post.reactions).length > 0 &&
-                                                <>{/* FIX: Added explicit type for userIds to resolve TS error */}
-                                                {Object.entries(post.reactions).filter(([, userIds]: [string, string[]]) => userIds.length > 0).slice(0, 3).map(([emoji]) => <span key={emoji}>{emoji}</span>)}
-                                                <span className="ml-1">{/* FIX: Replaced reduce().concat() with flat() to robustly flatten the array of reaction user lists and get the total count. The cast is necessary due to potential type inference issues. */ (Object.values(post.reactions) as string[][]).flat().length}</span>
+                                                <>{Object.entries(post.reactions).filter(([, userIds]) => Array.isArray(userIds) && userIds.length > 0).slice(0, 3).map(([emoji]) => <span key={emoji}>{emoji}</span>)}
+                                                {/* FIX: Made reaction count logic more robust by filtering for arrays before flattening. This prevents runtime errors if localStorage data is malformed. */}
+                                                <span className="ml-1">{Object.values(post.reactions).filter(Array.isArray).flat().length}</span>
                                                 </>
                                             }
                                         </div>
@@ -1813,11 +2171,11 @@ const OnlineFeedPage: React.FC<OnlineFeedPageProps> = ({ user, onLogout, onBackT
              {chatTarget && <MiniChatWindow currentUser={user as User} targetUser={chatTarget} onClose={() => setChatTarget(null)} />}
              {mapPreviewUrl && <MapPreviewModal url={mapPreviewUrl} onClose={() => setMapPreviewUrl(null)} />}
              {isAddStoryModalOpen && <AddStoryModal user={currentUser} onClose={() => setIsAddStoryModalOpen(false)} onStoryPosted={refreshStories} />}
-             {viewingStoriesOfUser && <StoryViewer onClose={() => setViewingStoriesOfUser(null)} />}
+             {viewingStoriesOfUser && <StoryViewer onClose={() => setViewingStoriesOfUser(null)} storiesByUser={storiesByUser} startUser={viewingStoriesOfUser} currentUser={user} />}
              {postToDelete && <ConfirmationModal isOpen={true} title="Delete Post" message="Are you sure you want to permanently delete this post?" onConfirm={confirmDelete} onCancel={() => setPostToDelete(null)} confirmButtonVariant="danger" />}
             {viewingListing && <ListingDetailModal listing={viewingListing} onClose={() => setViewingListing(null)} onStartMessage={handleStartMiniChat} currentUserId={currentUserId} />}
             
-            <header className="bg-gray-800 p-2 flex items-center justify-between gap-2 border-b border-gray-700 sticky top-0 z-[100]">
+            <header className="bg-gray-800 p-2 flex items-center justify-between gap-2 border-b border-gray-700">
                 <div className="flex items-center gap-2">
                     {onBackToDashboard && <button onClick={onBackToDashboard} className="p-2 rounded-full hover:bg-gray-700">&larr;</button>}
                     <div className="flex items-center gap-2">

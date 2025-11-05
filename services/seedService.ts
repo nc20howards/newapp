@@ -166,7 +166,7 @@ export const seedInitialData = () => {
             { name: STUDENT_TRANSFER_MODULE_NAME, description: 'A marketplace for schools to request or propose the transfer of students to manage capacity.', isAssignable: true },
             { name: NEWS_FEED_MODULE_NAME, description: 'Provides students with a feed of the latest news, summarized by AI from Google Search.', isAssignable: true },
             { name: E_VOTE_MODULE_NAME, description: 'Facilitates democratic student elections with live result tracking.', isAssignable: true },
-            { name: VISITOR_REG_MODULE_NAME, description: 'Manage visitor entry and exit, including ID scanning and logging.', isAssignable: true },
+            { name: VISITOR_REG_MODULE_NAME, description: 'Manage visitor check-in and check-out, with AI-powered ID scanning for efficient registration and tracking.', isAssignable: true },
         ];
 
         // Get the current list of modules from storage.

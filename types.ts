@@ -1,7 +1,7 @@
 // types.ts
 
 // --- User & Auth Types ---
-export type SchoolUserRole = 'student' | 'teacher' | 'head_of_department' | 'canteen_seller' | 'deputy_headteacher' | 'parent' | 'old_student' | 'carrier';
+export type SchoolUserRole = 'student' | 'teacher' | 'head_of_department' | 'canteen_seller' | 'deputy_headteacher' | 'parent' | 'old_student' | 'carrier' | 'security_guard';
 
 export interface User {
   name: string;
@@ -232,12 +232,13 @@ export interface Story {
   userId: string;
   userName: string;
   userAvatar?: string;
-  mediaUrl: string;
-  mediaType: 'image' | 'video';
+  mediaUrl?: string;
+  mediaType?: 'image' | 'video' | 'audio';
   content?: string;
   timestamp: number;
   expiresAt: number;
   reactions: Record<string, string[]>;
+  viewedBy: string[];
 }
 
 export interface ChatConversation {
@@ -698,33 +699,28 @@ export interface VoteRecord {
   choices: Record<string, string>; // { [categoryId]: contestantId }
 }
 
-// --- Visitor Registration ---
+// --- Visitor Management ---
 export interface ExtractedIdData {
-    fullName: string;
-    idNumber: string;
-    dateOfBirth?: string;
-    expiryDate?: string;
-    nationality?: string;
-}
-
-export interface Visitor {
-    id: string; // Can be the ID number itself if unique
-    schoolId: string;
-    fullName: string;
-    idNumber: string;
-    firstSeen: number;
-    avatarUrl?: string; // from captured ID
+    fullName: string | null;
+    idNumber: string | null;
+    idType: string | null;
+    dateOfBirth: string | null;
+    dateOfExpiry: string | null;
+    nationality: string | null;
 }
 
 export interface VisitorLog {
-    id: string;
-    visitorId: string;
+    id: string; // log entry ID
+    visitorIdNumber: string; // The ID number from the card, used for grouping
+    visitorName: string;
     schoolId: string;
-    cardNumber: string;
     entryTime: number;
-    exitTime: number | null;
+    exitTime?: number;
     reasonForVisit: string;
-    personToSee: string;
-    frontIdImage: string; // base64
-    backIdImage: string; // base64
+    personToSee?: string;
+    passNumber: string; // The unique number given to the visitor
+    status: 'checked_in' | 'checked_out';
+    idFrontImage: string; // data URL of the front of the ID
+    idBackImage?: string; // data URL of the back of the ID
+    extractedData: ExtractedIdData;
 }

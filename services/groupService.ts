@@ -348,7 +348,7 @@ export const getStoriesGroupedByUser = (): Record<string, Story[]> => {
 /**
  * Adds a new story to a user's collection of stories.
  */
-export const addStory = (storyData: Omit<Story, 'id' | 'timestamp' | 'expiresAt' | 'userName' | 'userAvatar' | 'reactions'>): Story => {
+export const addStory = (storyData: Omit<Story, 'id' | 'timestamp' | 'expiresAt' | 'userName' | 'userAvatar' | 'reactions' | 'viewedBy'>): Story => {
     const allStories = getActiveStories();
     const user = findUserById(storyData.userId);
     if (!user) throw new Error("User not found to create story.");
@@ -362,6 +362,7 @@ export const addStory = (storyData: Omit<Story, 'id' | 'timestamp' | 'expiresAt'
         timestamp: now,
         expiresAt: now + 24 * 60 * 60 * 1000, // 24 hours from now
         reactions: {},
+        viewedBy: [],
     };
 
     // Add the new story to the existing list of stories
@@ -413,6 +414,23 @@ export const toggleStoryReaction = (storyId: string, userId: string, emoji: stri
 
     stories[storyIndex] = story;
     saveStories(stories);
+};
+
+export const markStoryAsViewed = (storyId: string, userId: string): void => {
+    const stories = getStoriesFromStorage();
+    const storyIndex = stories.findIndex(s => s.id === storyId);
+    if (storyIndex === -1) return;
+
+    const story = stories[storyIndex];
+    if (!story.viewedBy) {
+        story.viewedBy = [];
+    }
+
+    if (!story.viewedBy.includes(userId)) {
+        story.viewedBy.push(userId);
+        stories[storyIndex] = story;
+        saveStories(stories);
+    }
 };
 
 

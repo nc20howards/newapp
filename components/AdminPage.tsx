@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 // FIX: Added UnebResultEntry and CustomIdTemplate to imports for use in the new UNEB admin components and Smart ID editor.
 import { AdminUser, School, Module, User as SchoolUser, AuditLogEntry, UnebPassSlip, UnebStats, CustomIdTemplate, SchoolUserRole, ExtractedUnebSlipData, AdmissionSettings, CompletedAdmission, PinResetRequest, SchoolClass, SmartIDSettings, CustomIdField, IpWhitelistSettings, StudentTransferProposal, TransferNegotiation, SchoolALevelCombination } from '../types';
 import { getAllSchools, activateModuleForSchool, deactivateModuleForSchool, publishModuleForSchool, unpublishModuleForSchool, publishHomePage, unpublishHomePage } from '../services/schoolService';
-import { getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, MESSAGE_MODULE_NAME, EXPLORATION_MODULE_NAME, E_VOTE_MODULE_NAME } from '../services/moduleService';
+import { getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, MESSAGE_MODULE_NAME, EXPLORATION_MODULE_NAME, E_VOTE_MODULE_NAME, VISITOR_REG_MODULE_NAME } from '../services/moduleService';
 import * as studentService from '../services/studentService';
 import { extractTextFromImageWithGoogle } from '../services/apiService';
 // FIX: Imported UNEB service functions for use in the new UNEB admin components.
@@ -37,6 +37,7 @@ import ConfirmationModal from './ConfirmationModal';
 import ExplorationPage from './ExplorationPage';
 import { createBroadcastNotification } from '../services/notificationService';
 import EVoteAdminPage from './EVoteAdminPage';
+import VisitorRegPage from './VisitorRegPage';
 
 // --- TYPE DEFINITIONS for Smart Admission ---
 type KioskView = 'main' | 'index' | 'scan';
@@ -100,6 +101,7 @@ const moduleNameToViewMap: Record<string, string> = {
     [ONLINE_MODULE_NAME]: 'online_feed',
     [EXPLORATION_MODULE_NAME]: 'exploration',
     [E_VOTE_MODULE_NAME]: 'e_vote',
+    [VISITOR_REG_MODULE_NAME]: 'visitor_reg',
 };
 
 
@@ -1441,6 +1443,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ user, onLogout }) => {
                 }
                 if (view === 'e_vote') {
                     return <EVoteAdminPage school={schoolForHeadteacher} user={user} />;
+                }
+                if (view === 'visitor_reg') {
+                    return <VisitorRegPage school={schoolForHeadteacher} user={user} />;
                 }
                 return <HeadteacherDashboardView school={schoolForHeadteacher} students={students} activeModules={activeModules} />;
             case 'uneb_admin':
