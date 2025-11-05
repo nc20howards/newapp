@@ -321,10 +321,18 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
             
             {activeTab === 'logs' && (
                 <div className="bg-gray-800 p-6 rounded-lg">
-                    <h3 className="text-xl font-bold mb-4">Visitor Log</h3>
+                    <h3 className="text-xl font-bold mb-4 text-white">Visitor Log</h3>
                     <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-700/50"><tr><th className="p-2 text-left">Visitor</th><th className="p-2 text-left">Reason</th><th className="p-2 text-left">Entry Time</th><th className="p-2 text-left">Exit Time</th><th className="p-2 text-left">Status</th></tr></thead>
+                        <table className="min-w-full text-sm text-white">
+                            <thead className="bg-gray-700/50">
+                                <tr>
+                                    <th className="p-2 text-left font-semibold">Visitor</th>
+                                    <th className="p-2 text-left font-semibold">Reason</th>
+                                    <th className="p-2 text-left font-semibold">Entry Time</th>
+                                    <th className="p-2 text-left font-semibold">Exit Time</th>
+                                    <th className="p-2 text-left font-semibold">Status</th>
+                                </tr>
+                            </thead>
                             <tbody className="divide-y divide-gray-700">
                                 {logs.map(log => (
                                     <tr key={log.id} className="hover:bg-gray-700/50">
@@ -332,12 +340,16 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
                                         <td className="p-2">{log.reasonForVisit}</td>
                                         <td className="p-2">{new Date(log.entryTime).toLocaleString()}</td>
                                         <td className="p-2">{log.exitTime ? new Date(log.exitTime).toLocaleString() : 'N/A'}</td>
-                                        <td className="p-2"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${log.status === 'checked_in' ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-400'}`}>{log.status.replace('_', ' ')}</span></td>
+                                        <td className="p-2">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${log.status === 'checked_in' ? 'bg-green-500/20 text-green-300' : 'bg-gray-500/20 text-gray-300'}`}>
+                                                {log.status.replace('_', ' ')}
+                                            </span>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                        {logs.length === 0 && <p className="text-center py-8 text-gray-400">No visitor logs found.</p>}
+                        {logs.length === 0 && <p className="text-center py-8 text-white">No visitor logs found.</p>}
                     </div>
                 </div>
             )}
