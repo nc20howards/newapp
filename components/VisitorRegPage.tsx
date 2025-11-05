@@ -2,22 +2,14 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { School, AdminUser, ExtractedIdData, VisitorLog } from '../types';
 import * as apiService from '../services/apiService';
 import * as visitorService from '../services/visitorService';
-import ConfirmationModal from './ConfirmationModal';
-import UserAvatar from './UserAvatar';
 
 declare var QRCode: any;
 
-const fileToBase64 = (file: File): Promise<{ data: string, mime: string }> => {
+const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);
-        reader.onload = () => {
-            const result = reader.result as string;
-            resolve({
-                data: result.split(',')[1],
-                mime: result.match(/:(.*?);/)?.[1] || 'image/jpeg'
-            });
-        };
+        reader.onload = () => resolve(reader.result as string);
         reader.onerror = error => reject(error);
     });
 };
@@ -45,7 +37,19 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
     const [passNumberOut, setPassNumberOut] = useState('');
     const [checkOutFeedback, setCheckOutFeedback] = useState({ type: '', message: '' });
 
+    // State for new image input flow
+    const [choiceModalFor, setChoiceModalFor] = useState<'front' | 'back' | null>(null);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+    const [selectedDeviceIndex, setSelectedDeviceIndex] = useState(0);
+
+
+    // Refs
     const qrCodeRef = useRef<HTMLDivElement>(null);
+    const frontFileInputRef = useRef<HTMLInputElement>(null);
+    const backFileInputRef = useRef<HTMLInputElement>(null);
+    const videoRef = useRef<HTMLVideoElement>(null);
+
 
     const refreshLogs = useCallback(() => {
         setLogs(visitorService.getVisitorLogsForSchool(school.id));
@@ -58,10 +62,10 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
         const file = e.target.files?.[0];
         if (file) {
-            const preview = URL.createObjectURL(file);
-            const { data } = await fileToBase64(file);
-            if (side === 'front') setIdFront({ preview, base64: data });
-            else setIdBack({ preview, base64: data });
+            const dataUrl = await fileToDataUrl(file);
+            const base64 = dataUrl.split(',')[1];
+            if (side === 'front') setIdFront({ preview: dataUrl, base64 });
+            else setIdBack({ preview: dataUrl, base64 });
         }
     };
 
@@ -139,6 +143,102 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
         setGeneratedPass(null);
     };
 
+    // --- New Image Input Logic ---
+    const handleImageAreaClick = (side: 'front' | 'back') => {
+        setChoiceModalFor(side);
+    };
+
+    const handleUploadClick = () => {
+        if (choiceModalFor === 'front') {
+            frontFileInputRef.current?.click();
+        } else if (choiceModalFor === 'back') {
+            backFileInputRef.current?.click();
+        }
+        setChoiceModalFor(null);
+    };
+
+    const handleCameraClick = () => {
+        setIsCameraOpen(true);
+    };
+
+    useEffect(() => {
+        let stream: MediaStream | null = null;
+        const startCamera = async () => {
+            try {
+                // Stop any existing stream before starting a new one
+                if (videoRef.current?.srcObject) {
+                    (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
+                }
+
+                // First, get the list of devices to see if we have multiple cameras
+                if (videoDevices.length === 0) {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoDevs = devices.filter(d => d.kind === 'videoinput');
+                    setVideoDevices(videoDevs);
+                }
+                
+                // If we have devices, use the selected one
+                let constraints: MediaStreamConstraints = {
+                    video: { facingMode: "environment" } // Prefer back camera initially
+                };
+                if (videoDevices.length > 0) {
+                    const deviceId = videoDevices[selectedDeviceIndex]?.deviceId;
+                    if(deviceId) {
+                        constraints = { video: { deviceId: { exact: deviceId } } };
+                    }
+                }
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                setError("Could not access camera. Please ensure permissions are granted.");
+                setIsCameraOpen(false);
+                setChoiceModalFor(null);
+            }
+        };
+
+        if (isCameraOpen) {
+            startCamera();
+        }
+
+        return () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        };
+    }, [isCameraOpen, selectedDeviceIndex, videoDevices]);
+    
+    const handleCapture = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const context = canvas.getContext('2d');
+            if (context) {
+                context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+                const dataUrl = canvas.toDataURL('image/jpeg');
+                const base64 = dataUrl.split(',')[1];
+                
+                if (choiceModalFor === 'front') {
+                    setIdFront({ preview: dataUrl, base64 });
+                } else if (choiceModalFor === 'back') {
+                    setIdBack({ preview: dataUrl, base64 });
+                }
+            }
+            setIsCameraOpen(false);
+            setChoiceModalFor(null);
+        }
+    };
+
+    const handleSwitchCamera = () => {
+        if (videoDevices.length > 1) {
+            setSelectedDeviceIndex(prevIndex => (prevIndex + 1) % videoDevices.length);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <h2 className="text-2xl sm:text-3xl font-bold text-white">Visitor Registration</h2>
@@ -160,17 +260,23 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
                                     {['front', 'back'].map(side => (
                                         <div key={side}>
                                             <label className="text-sm font-semibold block mb-2 capitalize">ID {side}</label>
-                                            <label className="cursor-pointer flex flex-col items-center justify-center p-4 bg-gray-700 hover:bg-gray-600 rounded-lg border-2 border-dashed border-gray-500 h-32">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleImageAreaClick(side as 'front' | 'back')}
+                                                className="w-full cursor-pointer flex flex-col items-center justify-center p-4 bg-gray-700 hover:bg-gray-600 rounded-lg border-2 border-dashed border-gray-500 h-32"
+                                            >
                                                 {(side === 'front' ? idFront : idBack) ? (
                                                     <img src={(side === 'front' ? idFront : idBack)?.preview} alt={`ID ${side}`} className="max-h-full max-w-full object-contain" />
                                                 ) : (
-                                                    <span className="text-gray-400 text-xs">Click to upload or capture</span>
+                                                    <span className="text-gray-400 text-xs">Click to choose source</span>
                                                 )}
-                                                <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => handleFileSelect(e, side as 'front' | 'back')} />
-                                            </label>
+                                            </button>
                                         </div>
                                     ))}
                                 </div>
+                                <input type="file" accept="image/*" className="hidden" ref={frontFileInputRef} onChange={e => handleFileSelect(e, 'front')} />
+                                <input type="file" accept="image/*" className="hidden" ref={backFileInputRef} onChange={e => handleFileSelect(e, 'back')} />
+
                                 <button onClick={handleProcessIds} disabled={isLoading || !idFront} className="w-full py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold disabled:bg-gray-500">
                                     {isLoading ? 'Processing with AI...' : 'Process ID(s)'}
                                 </button>
@@ -232,6 +338,47 @@ const VisitorRegPage: React.FC<VisitorRegPageProps> = ({ school, user }) => {
                             </tbody>
                         </table>
                         {logs.length === 0 && <p className="text-center py-8 text-gray-400">No visitor logs found.</p>}
+                    </div>
+                </div>
+            )}
+
+            {/* Modals for image source selection */}
+            {choiceModalFor && !isCameraOpen && (
+                <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50 p-4">
+                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm space-y-4 text-center">
+                        <h3 className="text-xl font-bold">Choose Image Source</h3>
+                        <p className="text-sm text-gray-400">Select how you want to provide the ID image for the {choiceModalFor}.</p>
+                        <div className="flex flex-col space-y-3">
+                            <button onClick={handleCameraClick} className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold">Use Camera</button>
+                            <button onClick={handleUploadClick} className="w-full py-3 bg-gray-600 hover:bg-gray-500 rounded-md font-semibold">Upload from File</button>
+                        </div>
+                        <button onClick={() => setChoiceModalFor(null)} className="mt-2 text-sm text-gray-400 hover:underline">Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {isCameraOpen && (
+                <div className="fixed inset-0 bg-black/70 flex justify-center items-center z-50 p-4">
+                    <div className="bg-gray-800 rounded-lg p-6 w-full max-w-2xl space-y-4">
+                        <h3 className="text-xl font-bold">Capture ID</h3>
+                        <div className="relative">
+                            <video ref={videoRef} autoPlay playsInline className="w-full rounded-lg bg-gray-900"></video>
+                            {videoDevices.length > 1 && (
+                                <button
+                                    onClick={handleSwitchCamera}
+                                    className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/75"
+                                    title="Switch Camera"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.664 0l3.181-3.183m-4.991-2.695v4.992h-4.992" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+                        <div className="flex justify-center space-x-4">
+                            <button onClick={() => { setIsCameraOpen(false); setChoiceModalFor(null); }} className="px-6 py-2 bg-gray-600 rounded-md">Cancel</button>
+                            <button onClick={handleCapture} className="px-6 py-2 bg-cyan-600 rounded-md font-semibold">Capture Photo</button>
+                        </div>
                     </div>
                 </div>
             )}
