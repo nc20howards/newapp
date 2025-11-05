@@ -697,3 +697,34 @@ export interface VoteRecord {
   timestamp: number;
   choices: Record<string, string>; // { [categoryId]: contestantId }
 }
+
+// --- Visitor Registration ---
+export interface ExtractedIdData {
+    fullName: string;
+    idNumber: string;
+    dateOfBirth?: string;
+    expiryDate?: string;
+    nationality?: string;
+}
+
+export interface Visitor {
+    id: string; // Can be the ID number itself if unique
+    schoolId: string;
+    fullName: string;
+    idNumber: string;
+    firstSeen: number;
+    avatarUrl?: string; // from captured ID
+}
+
+export interface VisitorLog {
+    id: string;
+    visitorId: string;
+    schoolId: string;
+    cardNumber: string;
+    entryTime: number;
+    exitTime: number | null;
+    reasonForVisit: string;
+    personToSee: string;
+    frontIdImage: string; // base64
+    backIdImage: string; // base64
+}

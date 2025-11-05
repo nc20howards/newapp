@@ -14,6 +14,7 @@ export const EXPLORATION_MODULE_NAME = 'Exploration';
 export const STUDENT_TRANSFER_MODULE_NAME = 'Student Transfer';
 export const NEWS_FEED_MODULE_NAME = 'News Feed';
 export const E_VOTE_MODULE_NAME = 'E-Vote';
+export const VISITOR_REG_MODULE_NAME = 'Visitor Reg';
 
 
 // Helper to get modules from localStorage

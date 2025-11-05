@@ -1,6 +1,6 @@
 import { registerSchool, getAllSchools } from './schoolService';
 import { createAdminUser, getAllAdminUsers } from './userService';
-import { createModule, getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, MESSAGE_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, EXPLORATION_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, NEWS_FEED_MODULE_NAME, E_VOTE_MODULE_NAME } from './moduleService';
+import { createModule, getAllModules, HOME_PAGE_MODULE_NAME, SMART_ADMISSION_MODULE_NAME, MESSAGE_MODULE_NAME, E_WALLET_MODULE_NAME, ONLINE_MODULE_NAME, SMART_STUDENT_ID_MODULE_NAME, E_CANTEEN_MODULE_NAME, NCHE_MODULE_NAME, EXPLORATION_MODULE_NAME, STUDENT_TRANSFER_MODULE_NAME, NEWS_FEED_MODULE_NAME, E_VOTE_MODULE_NAME, VISITOR_REG_MODULE_NAME } from './moduleService';
 import { createSchoolUser, assignSellerToShop } from './studentService';
 // FIX: Changed UnebResultEntry to UnebPassSlip to match the type exported from `types` and updated the seed data structure accordingly.
 import { UnebPassSlip, Module, School, User } from '../types';
@@ -166,6 +166,7 @@ export const seedInitialData = () => {
             { name: STUDENT_TRANSFER_MODULE_NAME, description: 'A marketplace for schools to request or propose the transfer of students to manage capacity.', isAssignable: true },
             { name: NEWS_FEED_MODULE_NAME, description: 'Provides students with a feed of the latest news, summarized by AI from Google Search.', isAssignable: true },
             { name: E_VOTE_MODULE_NAME, description: 'Facilitates democratic student elections with live result tracking.', isAssignable: true },
+            { name: VISITOR_REG_MODULE_NAME, description: 'Manage visitor entry and exit, including ID scanning and logging.', isAssignable: true },
         ];
 
         // Get the current list of modules from storage.
@@ -232,16 +233,17 @@ export const seedInitialData = () => {
         const studentTransferModule = modules.find(m => m.name === STUDENT_TRANSFER_MODULE_NAME);
         const newsFeedModule = modules.find(m => m.name === NEWS_FEED_MODULE_NAME);
         const eVoteModule = modules.find(m => m.name === E_VOTE_MODULE_NAME);
+        const visitorRegModule = modules.find(m => m.name === VISITOR_REG_MODULE_NAME);
 
 
-        if (!homePageModule || !smartAdmissionModule || !messageModule || !eWalletModule || !onlineModule || !smartStudentIdModule || !eCanteenModule || !ncheModule || !explorationModule || !studentTransferModule || !newsFeedModule || !eVoteModule) {
+        if (!homePageModule || !smartAdmissionModule || !messageModule || !eWalletModule || !onlineModule || !smartStudentIdModule || !eCanteenModule || !ncheModule || !explorationModule || !studentTransferModule || !newsFeedModule || !eVoteModule || !visitorRegModule) {
             throw new Error("Core modules are missing, cannot proceed with school seeding.");
         }
 
         // --- Create Schools and Assign Modules ---
         // Note: The Home Page module is now added automatically by registerSchool.
         // We only need to pass the other modules we want to assign.
-        const school1Modules = [smartAdmissionModule.id, messageModule.id, eWalletModule.id, onlineModule.id, smartStudentIdModule.id, eCanteenModule.id, ncheModule.id, explorationModule.id, studentTransferModule.id, newsFeedModule.id, eVoteModule.id];
+        const school1Modules = [smartAdmissionModule.id, messageModule.id, eWalletModule.id, onlineModule.id, smartStudentIdModule.id, eCanteenModule.id, ncheModule.id, explorationModule.id, studentTransferModule.id, newsFeedModule.id, eVoteModule.id, visitorRegModule.id];
         
         const school1 = registerSchool({
             name: 'Northwood High School',
