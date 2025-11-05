@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { User, Module, ExtractedUnebSlipData, UnebPassSlip, AdmissionSettings, AdminUser, School, CustomIdTemplate, CanteenShop, InternalExamResult, SchoolClass, StudentTransferProposal, TransferNegotiation, CompletedAdmission } from '../types';
 import { APP_TITLE } from '../constants';
@@ -96,6 +97,80 @@ const StarIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-
 const TargetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" /></svg>;
 const ThumbsUpIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-orange-400" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>;
 const NewsIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5zm3 1h6v4H5V6zm6 6H5v2h6v-2z" clipRule="evenodd" /><path d="M15 7h1a2 2 0 012 2v5.5a1.5 1.5 0 01-3 0V7z" /></svg>);
+
+// --- News Feed View ---
+const NewsFeedView: React.FC = () => {
+    const [news, setNews] = useState<{ title: string; summary: string; url: string; imageUrl: string; }[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [category, setCategory] = useState('Technology'); // Default category
+
+    const newsCategories = ['Technology', 'World News', 'Business', 'Sports', 'Entertainment', 'Uganda'];
+
+    useEffect(() => {
+        const fetchNews = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const newsData = await getNewsFromAI(category);
+                setNews(newsData);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : "Failed to fetch news.");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchNews();
+    }, [category]);
+
+    return (
+        <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                <div>
+                    <h2 className="text-2xl sm:text-3xl font-bold text-white">News Feed</h2>
+                    <p className="text-gray-400 mt-1">Latest headlines powered by AI.</p>
+                </div>
+            </div>
+
+            <div className="mb-6">
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4">
+                    {newsCategories.map(cat => (
+                        <button 
+                            key={cat}
+                            onClick={() => setCategory(cat)}
+                            className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap ${category === cat ? 'bg-cyan-600' : 'bg-gray-800 hover:bg-gray-700'}`}
+                        >
+                            {cat}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {isLoading && (
+                <div className="text-center p-8">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto"></div>
+                    <p className="mt-4 text-gray-400">Fetching latest news...</p>
+                </div>
+            )}
+            {error && <div className="bg-red-500/20 text-red-300 p-4 rounded-lg">{error}</div>}
+            
+            {!isLoading && !error && (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {news.map((story, index) => (
+                        <a href={story.url} target="_blank" rel="noopener noreferrer" key={index} className="bg-gray-800 rounded-lg shadow-xl flex flex-col cursor-pointer hover:ring-2 hover:ring-cyan-500 transition-all transform hover:-translate-y-1">
+                            <img src={story.imageUrl} alt={story.title} className="w-full h-40 object-cover rounded-t-lg bg-gray-700" />
+                            <div className="p-4 flex flex-col flex-grow">
+                                <h4 className="font-bold text-lg text-white flex-grow">{story.title}</h4>
+                                <p className="text-sm text-gray-300 mt-2">{story.summary}</p>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
 
 // --- Results Analytics Sub-component ---
 const ResultsAnalytics: React.FC<{ results: InternalExamResult[] }> = ({ results }) => {
@@ -383,6 +458,9 @@ interface StudentAdmissionPortalProps {
     user?: User;
     school: School;
     onBack: () => void;
+    onAdmissionStaged: (data: UnebPassSlip | ExtractedUnebSlipData) => void;
+    stagedData: UnebPassSlip | ExtractedUnebSlipData | null;
+    onStagedDataConsumed: () => void;
     isNewUserFlow?: boolean;
     onAdmissionSuccess?: (creds: { studentId: string; tempPass: string }) => void;
 }
@@ -504,7 +582,7 @@ const AdmissionStatusView: React.FC<{
     );
 };
 
-export const StudentAdmissionPortal: React.FC<StudentAdmissionPortalProps> = ({ user, school, onBack, isNewUserFlow, onAdmissionSuccess }) => {
+export const StudentAdmissionPortal: React.FC<StudentAdmissionPortalProps> = ({ user, school, onBack, onAdmissionStaged, stagedData, onStagedDataConsumed, isNewUserFlow, onAdmissionSuccess }) => {
     type SelfAdmissionTab = 'scan' | 'index' | 'form' | null;
 
     // State for application flow
@@ -559,6 +637,20 @@ export const StudentAdmissionPortal: React.FC<StudentAdmissionPortalProps> = ({ 
         }
         setIsLoadingAdmission(false);
     }, [currentUserId, schoolId]);
+    
+    useEffect(() => {
+        if (stagedData && user && !isNewUserFlow) {
+            setDataForVerification(stagedData);
+            try {
+                const wallet = eWalletService.getWalletForUser(user.studentId);
+                setWalletBalance(wallet.balance);
+                setIsPaymentModalOpen(true);
+            } catch (e) {
+                setError("Could not retrieve your E-Wallet. Please ensure your account is set up correctly.");
+            }
+            onStagedDataConsumed();
+        }
+    }, [stagedData, user, onStagedDataConsumed, isNewUserFlow]);
 
     useEffect(() => {
         if (schoolId) {
@@ -1052,14 +1144,19 @@ export const StudentAdmissionPortal: React.FC<StudentAdmissionPortalProps> = ({ 
 
                             if (isNewUserFlow) {
                                 handleConfirmAndSubmit();
-                            } else if (user) {
+                            } else if (user && settings) {
                                 if (isUnebVerificationEnabled() && !isVerified) {
                                     setError("This application cannot be submitted because the UNEB results could not be officially verified. Please check the index number and try again, or contact the school for assistance.");
                                     setDataForVerification(null); return;
                                 }
                                 try {
                                     const wallet = eWalletService.getWalletForUser(user.studentId);
-                                    setWalletBalance(wallet.balance); setIsPaymentModalOpen(true);
+                                    if (wallet.balance >= settings.admissionFee) {
+                                        setWalletBalance(wallet.balance);
+                                        setIsPaymentModalOpen(true);
+                                    } else {
+                                        onAdmissionStaged(dataForVerification);
+                                    }
                                 } catch (e) { setError("Could not retrieve your E-Wallet. Please ensure your account is set up correctly before proceeding."); }
                             }
                         }}
@@ -1250,12 +1347,11 @@ export const StudentAdmissionPortal: React.FC<StudentAdmissionPortalProps> = ({ 
     );
 };
 
-// FIX: Added missing SmartIdViewer component definition before its usage in StudentPage.
 // --- Smart ID Viewer Modal ---
 interface SmartIdViewerProps {
     user: User;
     school: School;
-    settings: any; // Can be SmartIDSettings or CustomIdTemplate
+    settings: any; 
     templateType: 'default' | 'custom';
     onClose: () => void;
 }
@@ -1341,6 +1437,38 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
     // New state for ID card settings
     const [idCardSettings, setIdCardSettings] = useState<any>(null);
     const [idCardTemplateType, setIdCardTemplateType] = useState<'default' | 'custom'>('default');
+    
+    // State for staged admission
+    const [stagedAdmissionData, setStagedAdmissionData] = useState<UnebPassSlip | ExtractedUnebSlipData | null>(null);
+    const [wallet, setWallet] = useState(() => eWalletService.getWalletForUser(currentUser.studentId));
+
+    const eWalletModule = useMemo(() => availableModules.find(m => m.name === E_WALLET_MODULE_NAME), [availableModules]);
+    const admissionModule = useMemo(() => availableModules.find(m => m.name === SMART_ADMISSION_MODULE_NAME), [availableModules]);
+    const admissionSettings = useMemo(() => school ? settingsService.getAdmissionSettings(school.id) : null, [school]);
+    
+    const handleAdmissionStaged = (data: UnebPassSlip | ExtractedUnebSlipData) => {
+        setStagedAdmissionData(data);
+        if (eWalletModule) {
+            setCurrentView(eWalletModule.id);
+        }
+    };
+
+    const handleProceedWithStagedAdmission = () => {
+        if (admissionModule) {
+            setCurrentView(admissionModule.id);
+        }
+    };
+
+    // Poll for wallet updates when an admission is staged
+    useEffect(() => {
+        if (!stagedAdmissionData) return;
+
+        const interval = setInterval(() => {
+            setWallet(eWalletService.getWalletForUser(currentUser.studentId));
+        }, 2000); // Poll every 2 seconds
+
+        return () => clearInterval(interval);
+    }, [stagedAdmissionData, currentUser.studentId]);
 
     const refreshModulesAndSettings = useCallback(() => {
         if (currentUser.schoolId) {
@@ -1438,6 +1566,7 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
     };
 
     const activeModule = availableModules.find(m => m.id === currentView);
+    const isOnlineFeedView = activeModule?.name === ONLINE_MODULE_NAME;
 
     const renderMainContent = () => {
         if (currentUser.pendingTransferAcceptance) {
@@ -1448,13 +1577,44 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
             return <StudentResultsView user={currentUser} onDownload={setReportToDownload} isDownloading={isDownloading}/>;
         }
         if (activeModule?.name === SMART_ADMISSION_MODULE_NAME && school) {
-            return <StudentAdmissionPortal user={currentUser} school={school} onBack={() => setCurrentView('dashboard')} />;
+            return <StudentAdmissionPortal 
+                user={currentUser} 
+                school={school} 
+                onBack={() => setCurrentView('dashboard')}
+                onAdmissionStaged={handleAdmissionStaged}
+                stagedData={stagedAdmissionData}
+                onStagedDataConsumed={() => setStagedAdmissionData(null)}
+            />;
         }
         if (activeModule?.name === MESSAGE_MODULE_NAME) {
             return <SocialHubPage user={currentUser} onLogout={() => onLogout()} />;
         }
         if (activeModule?.name === E_WALLET_MODULE_NAME) {
-             return <EWalletPage user={currentUser} />;
+            return (
+                <>
+                    {stagedAdmissionData && admissionSettings && (
+                        <div className="bg-yellow-500/10 border border-yellow-500/30 text-white p-4 rounded-lg shadow-lg mb-6 text-center animate-fade-in-up">
+                            <h3 className="text-lg font-bold text-yellow-300">Pending Admission Payment</h3>
+                            <p className="text-sm text-yellow-200 mt-2">
+                                Your E-Wallet balance is insufficient to cover the admission fee of <strong>UGX {admissionSettings.admissionFee.toLocaleString()}</strong>.
+                                Please top up your account to proceed.
+                            </p>
+                            <div className="mt-4">
+                                <button
+                                    onClick={handleProceedWithStagedAdmission}
+                                    disabled={wallet.balance < admissionSettings.admissionFee}
+                                    className="w-full sm:w-auto px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-md font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {wallet.balance < admissionSettings.admissionFee
+                                        ? `Current Balance: UGX ${wallet.balance.toLocaleString()}`
+                                        : 'Proceed with Admission'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    <EWalletPage user={currentUser} />
+                </>
+            );
         }
         if (activeModule?.name === ONLINE_MODULE_NAME) {
             return <OnlineFeedPage user={currentUser} onLogout={() => onLogout()} onBackToDashboard={() => setCurrentView('dashboard')} onStartMessage={handleStartMessage} />;
@@ -1510,17 +1670,7 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
                     <div>
                         <h2 className="text-2xl sm:text-3xl font-bold text-white">{dashboardTitle}</h2>
                         <p className="text-gray-400 mt-1">Welcome back, {currentUser.name}!</p>
-                         {currentUser.accountStatus === 'temporary' && (
-                            <div className="mt-2 text-sm bg-yellow-500/20 text-yellow-300 p-2 rounded-lg inline-block">
-                                <strong>Account not verified.</strong> This is a temporary account with limited access.
-                            </div>
-                        )}
                     </div>
-                     {currentUser.accountStatus === 'temporary' && (
-                        <button onClick={() => onLogout(true)} className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-md text-sm font-semibold">
-                           &larr; Choose Other Schools
-                        </button>
-                    )}
                 </div>
                 <NotificationPermissionBanner />
             </div>
@@ -1529,45 +1679,44 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
 
     const navItems = [
         { id: 'dashboard', name: 'Dashboard', icon: <DashboardIcon /> },
-        { id: 'my-results', name: 'My Results', icon: <ResultsIcon /> },
+        { id: 'my-results', name: 'My Results', icon: <ResultsIcon /> }
     ];
 
-    const isOnlineFeedView = activeModule?.name === ONLINE_MODULE_NAME;
-
     return (
-        <div className="flex h-screen bg-gray-900 text-white font-sans">
+        <div className={`flex h-screen bg-gray-900 text-white font-sans ${isOnlineFeedView ? 'overflow-hidden' : ''}`}>
             {isIdCardVisible && school && idCardSettings && (
                  <SmartIdViewer user={currentUser} school={school} settings={idCardSettings} templateType={idCardTemplateType} onClose={() => setIsIdCardVisible(false)} />
             )}
             
+            {/* Hidden container for downloads */}
             <div ref={reportCardContainerRef} className="fixed -left-[9999px] top-0 p-4 bg-transparent">
                 {reportToDownload && school && <ReportCard user={currentUser} school={school} result={reportToDownload} />}
             </div>
-
-            {isSidebarExpanded && <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={() => setIsSidebarExpanded(false)}></div>}
             
-            <aside className={`fixed inset-y-0 left-0 bg-gray-800 text-white transform ${isSidebarExpanded ? 'translate-x-0' : '-translate-x-full'} lg:sticky lg:translate-x-0 z-40 flex flex-col transition-all duration-300 ${isSidebarExpanded ? 'w-64 p-4' : 'w-64 lg:w-20 lg:p-4'}`}>
-                 <div className="flex items-center justify-between mb-8 h-10">
-                    <div className={`flex items-center space-x-2 overflow-hidden pr-2 ${!isSidebarExpanded && 'lg:justify-center lg:w-full'}`}>
-                        <img src={schoolLogo || `https://picsum.photos/seed/default-logo/100/100`} alt="School Logo" className="w-10 h-10 rounded-full object-contain bg-white p-0.5 flex-shrink-0" />
-                        <span className={`font-bold text-xl truncate ${!isSidebarExpanded && 'lg:hidden'}`}>{schoolName.split(' ')[0]}</span>
-                    </div>
-                    <button onClick={() => setIsSidebarExpanded(false)} className={`p-2 rounded-md hover:bg-gray-700 flex-shrink-0 lg:hidden ${!isSidebarExpanded && 'hidden'}`}><CloseIcon /></button>
+            <aside className={`bg-gray-800 text-white ${isSidebarExpanded ? 'w-64 p-4' : 'w-20 p-2'} transition-all duration-300 flex-shrink-0 flex-col ${isOnlineFeedView ? 'hidden' : 'hidden sm:flex'}`}>
+                 <div className="flex items-center justify-center mb-8 h-10">
+                     {!isSidebarExpanded && <button onClick={() => setIsSidebarExpanded(true)} className="p-2 rounded-md hover:bg-gray-700"><HamburgerIcon /></button>}
+                     {isSidebarExpanded && (
+                        <div className="flex items-center justify-between w-full">
+                            <div className="flex items-center space-x-2 overflow-hidden pr-2">
+                                <img src={schoolLogo || `https://picsum.photos/seed/default-logo/100/100`} alt="School Logo" className="w-10 h-10 rounded-full object-contain bg-white p-0.5 flex-shrink-0" />
+                                <span className="font-bold text-xl truncate">{schoolName.split(' ')[0]}</span>
+                            </div>
+                            <button onClick={() => setIsSidebarExpanded(false)} className="p-2 rounded-md hover:bg-gray-700 flex-shrink-0"><CloseIcon /></button>
+                        </div>
+                     )}
                 </div>
                 <nav className="space-y-2 flex-grow">
                      {navItems.map(item => (
-                        <button key={item.id} onClick={() => {
-                            setCurrentView(item.id);
-                            setIsSidebarExpanded(false);
-                        }} className={`w-full flex items-center space-x-3 p-3 rounded-md transition-colors ${!isSidebarExpanded && 'lg:justify-center'} ${currentView === item.id ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}>
-                            {item.icon} <span className={!isSidebarExpanded ? 'lg:hidden' : ''}>{item.name}</span>
+                        <button key={item.id} onClick={() => setCurrentView(item.id)} title={item.name} className={`w-full flex items-center space-x-3 p-3 rounded-md transition-colors ${!isSidebarExpanded && 'justify-center'} ${currentView === item.id ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}>
+                            {item.icon} {isSidebarExpanded && <span>{item.name}</span>}
                         </button>
                     ))}
 
                     {availableModules.length > 0 && (
-                        isSidebarExpanded ? (
-                             <div className="w-full flex items-center space-x-3 p-3 rounded-md">
-                                <ModulesIcon />
+                         <div className={`w-full flex items-center space-x-3 p-3 rounded-md ${!isSidebarExpanded && 'justify-center'}`} title="Active Modules">
+                            <ModulesIcon />
+                            {isSidebarExpanded && (
                                 <select
                                     value={availableModules.find(m => m.id === currentView) ? currentView : ''}
                                     onChange={handleModuleSelect}
@@ -1580,41 +1729,43 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
                                         </option>
                                     ))}
                                 </select>
-                            </div>
-                         ) : (
-                             <button onClick={() => setIsSidebarExpanded(true)} className="w-full flex items-center justify-center space-x-3 p-3 rounded-md transition-colors hover:bg-gray-700" title="Active Modules">
-                                <ModulesIcon />
-                            </button>
-                         )
+                            )}
+                        </div>
                      )}
                 </nav>
             </aside>
             
             <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="flex-shrink-0 flex items-center justify-between p-4 bg-gray-800 border-l border-gray-700 shadow-md">
-                    <button onClick={() => setIsSidebarExpanded(prev => !prev)} className="p-1"><HamburgerIcon/></button>
-                    <div className="flex items-center space-x-4">
-                        <NotificationBell userId={currentUser.studentId} />
-                        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setIsProfileOpen(true)}>
-                            <UserAvatar name={currentUser.name} avatarUrl={currentUser.avatarUrl} className="w-10 h-10 rounded-full object-cover border-2 border-gray-600"/>
-                            <div className="hidden sm:block">
-                                <p className="font-semibold">{currentUser.name}</p>
-                                <p className="text-sm text-gray-400 capitalize">{currentUser.role.replace('_', ' ')}</p>
+                {!isOnlineFeedView && (
+                    <header className="flex-shrink-0 flex items-center justify-end p-4 bg-gray-800 border-l border-gray-700 shadow-md">
+                        <div className="flex items-center space-x-4">
+                            <NotificationBell userId={currentUser.studentId} />
+                            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setIsProfileOpen(true)}>
+                                <UserAvatar
+                                    name={currentUser.name}
+                                    avatarUrl={currentUser.avatarUrl}
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-gray-600"
+                                />
+                                <div className="text-right">
+                                    <p className="font-semibold hidden sm:block">{currentUser.name}</p>
+                                    <p className="font-semibold sm:hidden">{currentUser.name.split(' ')[0]}</p>
+                                    <p className="text-sm text-gray-400 capitalize">{currentUser.role.replace('_', ' ')}</p>
+                                </div>
                             </div>
+                            <button onClick={() => onLogout()} className="p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors" title="Logout">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                            </button>
                         </div>
-                        <button onClick={() => onLogout()} className="p-3 rounded-full text-red-500 hover:bg-red-500/20 transition-colors" title="Logout">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                        </button>
-                    </div>
-                </header>
+                    </header>
+                )}
 
-                <main className="flex-1 p-4 lg:p-8 overflow-y-auto border-l border-gray-700">
-                    <div className={isOnlineFeedView ? "w-full h-full" : "container mx-auto"}>
+                <main className={`flex-1 ${isOnlineFeedView ? '' : 'p-4 lg:p-8 overflow-y-auto border-l border-gray-700'}`}>
+                    <div className={`${isOnlineFeedView ? 'h-full' : 'container mx-auto'}`}>
                         {renderMainContent()}
                     </div>
                 </main>
             </div>
-             {isProfileOpen && (
+            {isProfileOpen && (
                 <ProfilePage
                     user={currentUser}
                     onClose={() => setIsProfileOpen(false)}
@@ -1624,114 +1775,6 @@ export const StudentPage: React.FC<StudentPageProps> = ({ user, onLogout }) => {
                     }}
                     classes={classes}
                 />
-            )}
-        </div>
-    );
-};
-
-// --- News Feed View ---
-interface NewsStory {
-  title: string;
-  summary: string;
-  url: string;
-  imageUrl: string;
-}
-
-const NewsFeedView: React.FC = () => {
-    const [news, setNews] = useState<NewsStory[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [activeCategory, setActiveCategory] = useState('Top Stories');
-    const [viewingUrl, setViewingUrl] = useState<string | null>(null);
-
-    const categories = ['Top Stories', 'Technology', 'Science', 'Sports', 'Arts & Culture'];
-
-    const fetchNews = useCallback(async (category: string) => {
-        setIsLoading(true);
-        setError('');
-        setNews([]);
-        try {
-            const results = await getNewsFromAI(category);
-            setNews(results);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        fetchNews(activeCategory);
-    }, [activeCategory, fetchNews]);
-
-    return (
-        <div>
-            {viewingUrl && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-90 z-50 flex flex-col p-4 sm:p-8 animate-slide-in-left-fade">
-                    <div className="flex justify-end mb-4 flex-shrink-0">
-                        <button
-                            onClick={() => setViewingUrl(null)}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-lg"
-                        >
-                            Close
-                        </button>
-                    </div>
-                    <div className="flex-1 bg-white rounded-lg overflow-hidden">
-                        <iframe
-                            src={viewingUrl}
-                            title="News Article"
-                            className="w-full h-full border-0"
-                            sandbox="allow-scripts allow-same-origin"
-                        />
-                    </div>
-                </div>
-            )}
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-6">News Feed</h2>
-            
-            <div className="flex items-center space-x-2 overflow-x-auto pb-4 mb-4">
-                {categories.map(category => (
-                    <button
-                        key={category}
-                        onClick={() => setActiveCategory(category)}
-                        className={`px-4 py-2 text-sm font-semibold rounded-full whitespace-nowrap ${activeCategory === category ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
-                    >
-                        {category}
-                    </button>
-                ))}
-            </div>
-
-            {isLoading && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[...Array(6)].map((_, i) => (
-                        <div key={i} className="bg-gray-800 rounded-lg shadow-lg animate-pulse">
-                            <div className="w-full h-40 bg-gray-700 rounded-t-lg"></div>
-                            <div className="p-4">
-                                <div className="h-4 bg-gray-700 rounded w-3/4 mb-2"></div>
-                                <div className="h-3 bg-gray-700 rounded w-full mb-1"></div>
-                                <div className="h-3 bg-gray-700 rounded w-5/6"></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            )}
-
-            {error && <div className="p-4 text-center bg-red-500/10 text-red-300 rounded-lg">{error}</div>}
-
-            {!isLoading && !error && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {news.map((story, index) => (
-                        <div key={index} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
-                            {story.imageUrl && <img src={story.imageUrl} alt={story.title} className="w-full h-40 object-cover" />}
-                            <div className="p-4 flex flex-col flex-grow">
-                                <h3 className="font-bold text-lg text-white mb-2 flex-grow">{story.title}</h3>
-                                <p className="text-sm text-gray-400 mb-4">{story.summary}</p>
-                                <button onClick={() => setViewingUrl(story.url)} className="text-cyan-400 hover:text-cyan-300 font-semibold self-start text-sm">
-                                    Read Full Story &rarr;
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
             )}
         </div>
     );
